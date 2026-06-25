@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Syslog AI Monitor</title>
+<style>
+  :root {
+    --bg: #0f1419; --panel: #1a212b; --panel2: #222b38; --text: #e6edf3;
+    --muted: #8b98a9; --line: #2b3543;
+    --ok: #2ea043; --warning: #d29922; --error: #f85149; --critical: #da3633;
+    --info: #58a6ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text);
+  }
+  header {
+    padding: 18px 24px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  .spacer { flex: 1; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .pill {
+    display: inline-block; padding: 2px 10px; border-radius: 999px;
+    font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em;
+  }
+  .status-ok { background: rgba(46,160,67,.18); color: var(--ok); }
+  .status-warning { background: rgba(210,153,34,.18); color: var(--warning); }
+  .status-error { background: rgba(248,81,73,.18); color: var(--error); }
+  main { max-width: 980px; margin: 0 auto; padding: 24px; }
+  .banner {
+    padding: 16px 20px; border-radius: 10px; margin-bottom: 24px;
+    border: 1px solid var(--line); background: var(--panel);
+  }
+  .banner h2 { margin: 0 0 6px; font-size: 16px; }
+  .banner.s-ok { border-left: 4px solid var(--ok); }
+  .banner.s-warning { border-left: 4px solid var(--warning); }
+  .banner.s-error { border-left: 4px solid var(--error); }
+  h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 28px 0 12px; }
+  .finding {
+    border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px;
+    margin-bottom: 12px; background: var(--panel);
+  }
+  .finding .top { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+  .finding .title { font-weight: 600; }
+  .sev { padding: 1px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+  .sev-info { background: rgba(88,166,255,.18); color: var(--info); }
+  .sev-warning { background: rgba(210,153,34,.18); color: var(--warning); }
+  .sev-error { background: rgba(248,81,73,.18); color: var(--error); }
+  .sev-critical { background: rgba(218,54,51,.25); color: var(--critical); }
+  .cat { color: var(--muted); font-size: 12px; }
+  .finding .detail { margin: 4px 0; }
+  .finding .evidence {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+    background: var(--panel2); padding: 8px 10px; border-radius: 6px; color: var(--muted);
+    white-space: pre-wrap; word-break: break-word; margin: 8px 0;
+  }
+  .finding .rec { font-size: 13px; color: var(--info); }
+  .history-item {
+    border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; background: var(--panel);
+  }
+  .history-item summary {
+    padding: 12px 16px; cursor: pointer; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  }
+  .history-item summary::-webkit-details-marker { display: none; }
+  .history-item .when { color: var(--muted); font-size: 13px; min-width: 160px; }
+  .history-item .sum { flex: 1; }
+  .history-body { padding: 0 16px 14px; }
+  .empty { color: var(--muted); padding: 20px 0; }
+  button.refresh {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 13px;
+  }
+  button.refresh:hover { background: var(--line); }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🛰️ Syslog AI Monitor</h1>
+  <span id="headStatus"></span>
+  <div class="spacer"></div>
+  <span class="meta" id="buffered"></span>
+  <button class="refresh" onclick="load()">Refresh</button>
+</header>
+
+<main>
+  <div id="latest"></div>
+  <h3>History</h3>
+  <div id="history"><div class="empty">Loading…</div></div>
+</main>
+
+<script>
+const fmt = (ts) => ts ? new Date(ts * 1000).toLocaleString() : "—";
+const esc = (s) => (s ?? "").toString().replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+function findingHTML(f) {
+  const sev = (f.severity || "info").toLowerCase();
+  return `<div class="finding">
+    <div class="top">
+      <span class="sev sev-${esc(sev)}">${esc(sev)}</span>
+      <span class="title">${esc(f.title)}</span>
+      <span class="cat">${esc(f.category)} · ×${esc(f.occurrences)}</span>
+    </div>
+    <div class="detail">${esc(f.detail)}</div>
+    ${f.evidence ? `<div class="evidence">${esc(f.evidence)}</div>` : ""}
+    ${f.recommendation ? `<div class="rec">→ ${esc(f.recommendation)}</div>` : ""}
+  </div>`;
+}
+
+function renderLatest(latest) {
+  const el = document.getElementById("latest");
+  if (!latest) {
+    el.innerHTML = `<div class="banner"><h2>No evaluations yet</h2>
+      <div class="meta">Logs are being collected. The first hourly evaluation will appear here.</div></div>`;
+    return;
+  }
+  const p = latest.payload || {};
+  const status = (p.overall_status || "ok").toLowerCase();
+  const findings = p.findings || [];
+  el.innerHTML = `
+    <div class="banner s-${esc(status)}">
+      <h2>Latest evaluation — ${fmt(latest.ts)}</h2>
+      <div>${esc(p.summary)}</div>
+      <div class="meta" style="margin-top:6px">${esc(latest.log_count)} log lines analyzed · ${findings.length} finding(s)</div>
+    </div>
+    ${findings.length ? `<h3>Findings</h3>${findings.map(findingHTML).join("")}`
+                      : `<div class="empty">No issues found in the latest period. ✅</div>`}`;
+}
+
+function statusPill(status) {
+  const s = (status || "ok").toLowerCase();
+  return `<span class="pill status-${esc(s)}">${esc(s)}</span>`;
+}
+
+function renderHistory(items) {
+  const el = document.getElementById("history");
+  if (!items.length) { el.innerHTML = `<div class="empty">No history yet.</div>`; return; }
+  el.innerHTML = items.map(it => {
+    const p = it.payload || {};
+    const findings = p.findings || [];
+    return `<details class="history-item">
+      <summary>
+        ${statusPill(p.overall_status)}
+        <span class="when">${fmt(it.ts)}</span>
+        <span class="sum">${esc(p.summary)}</span>
+      </summary>
+      <div class="history-body">
+        ${findings.length ? findings.map(findingHTML).join("")
+                          : `<div class="empty">No issues found.</div>`}
+      </div>
+    </details>`;
+  }).join("");
+}
+
+async function load() {
+  try {
+    const [statusRes, histRes] = await Promise.all([
+      fetch("/api/status").then(r => r.json()),
+      fetch("/api/history?limit=200").then(r => r.json()),
+    ]);
+    renderLatest(statusRes.latest);
+    document.getElementById("buffered").textContent =
+      `${statusRes.buffered_logs} logs buffered`;
+    document.getElementById("headStatus").innerHTML =
+      statusRes.latest ? statusPill((statusRes.latest.payload || {}).overall_status) : "";
+    renderHistory(histRes.findings || []);
+  } catch (e) {
+    document.getElementById("latest").innerHTML =
+      `<div class="banner s-error"><h2>Could not load data</h2><div class="meta">${esc(e)}</div></div>`;
+  }
+}
+
+load();
+setInterval(load, 60000);  // auto-refresh each minute
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+# Secrets & local config
+.env
+
+# Database / data
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+data/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# OS
+.DS_Store
+
+# iCloud placeholder cruft
+.icloud

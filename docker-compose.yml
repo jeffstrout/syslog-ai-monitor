@@ -1,0 +1,15 @@
+services:
+  syslog-ai-monitor:
+    build: .
+    container_name: syslog-ai-monitor
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "514:514/udp"     # syslog from the UDM Pro
+      - "514:514/tcp"     # syslog over TCP (optional)
+      - "8080:8080/tcp"   # web dashboard  ->  http://<pi-ip>:8080
+    volumes:
+      - syslog-data:/data
+
+volumes:
+  syslog-data:
