@@ -24,6 +24,34 @@ _RFC3164_RE = re.compile(
 )
 # RFC 5424 header:  1 TIMESTAMP host app ...
 _RFC5424_RE = re.compile(r"^1\s+\S+\s+(\S+)\s+(.*)$", re.DOTALL)
+# CEF payload start (UniFi "SIEM Server" export uses CEF over syslog).
+_CEF_RE = re.compile(r"CEF:\d+\|")
+
+
+def _cef_severity_to_syslog(message: str) -> int | None:
+    """Map a CEF Severity field (0-10) to a syslog severity (0=emerg..7=debug).
+
+    CEF format: CEF:Ver|Vendor|Product|Version|SigID|Name|Severity|Extension
+    Higher CEF severity = more serious, so it maps to a *lower* syslog number,
+    which keeps the existing 'severity <= 4 means elevated' logic working.
+    """
+    if not _CEF_RE.search(message):
+        return None
+    cef = message[message.index("CEF:"):]
+    fields = cef.split("|")
+    if len(fields) < 7:
+        return None
+    try:
+        cef_sev = int(float(fields[6].strip()))
+    except (ValueError, IndexError):
+        return None
+    if cef_sev >= 9:
+        return 2   # crit
+    if cef_sev >= 7:
+        return 3   # err
+    if cef_sev >= 4:
+        return 4   # warning
+    return 6       # info
 
 
 def parse_line(raw: str) -> tuple[str | None, int | None, int | None, str]:
@@ -48,6 +76,12 @@ def parse_line(raw: str) -> tuple[str | None, int | None, int | None, str]:
         host, body = m5.group(1), m5.group(2).strip()
     elif m3:
         host, body = m3.group(1), m3.group(2).strip()
+
+    # If this is a CEF line (UniFi SIEM export), prefer its own Severity field
+    # over the transport PRI — UniFi's PRI is often generic.
+    cef_sev = _cef_severity_to_syslog(body)
+    if cef_sev is not None:
+        severity = cef_sev
 
     if host in ("-", ""):
         host = None

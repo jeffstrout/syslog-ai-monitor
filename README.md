@@ -69,17 +69,27 @@ git pull && docker compose up -d --build
 
 ## Point the UDM Pro at the Pi
 
-In the UniFi Network application:
+In the UniFi Network application (tested on **Network 10.4.x**):
 
-**Settings → System → Logging / Remote Logging (Syslog)**
+**Settings → CyberSecure → Traffic Logging → Activity Logging (Syslog)**
 
-- Enable **Remote Syslog Server**
-- **Server / Host:** your Pi's LAN IP (e.g. `192.168.1.10`)
+- Select **SIEM Server**
+- **Server Address:** your Pi's LAN IP (e.g. `192.168.1.10`)
 - **Port:** `514`
-- Save. (Enabling "Debug"/verbose logging gives the AI more to work with, but is optional.)
+- Click **Apply Changes**.
 
-> The exact menu path varies slightly by UniFi version; look for "Remote Logging"
-> or "Syslog" under System settings.
+> **Finding it:** the fastest way is to type **`syslog`** into the Settings search
+> box — it jumps straight to the page. On older UniFi versions the equivalent
+> setting lived under **Settings → System → Remote Logging**; on current firmware
+> it's the CyberSecure path above.
+
+The UDM Pro's SIEM export sends logs in **CEF format** rather than classic syslog.
+This monitor parses CEF natively — it reads CEF's own Severity field so firewall
+blocks and threat events are surfaced while routine allowed-traffic noise is
+de-prioritized. No extra configuration needed.
+
+> **Flow Logging:** "Blocked Traffic Only" is a good low-noise default. "All
+> Traffic" sends far more (every allowed connection) — usable, but noisier.
 
 ---
 
