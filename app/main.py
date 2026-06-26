@@ -35,8 +35,14 @@ async def main() -> None:
     # Evaluation runs in a thread so the blocking Anthropic call and SQLite
     # writes don't stall the event loop serving syslog + web.
     scheduler = AsyncIOScheduler()
+    # Schedule the functions directly. APScheduler's AsyncIOExecutor runs sync
+    # job functions in a thread pool, which is exactly what we want for the
+    # blocking Anthropic call + SQLite writes — it keeps them off the event loop
+    # that serves syslog + web. (Do NOT wrap these in a lambda that calls
+    # asyncio.get_event_loop(): the job runs in a worker thread with no running
+    # loop, so that raises and the evaluation silently never happens.)
     scheduler.add_job(
-        lambda: asyncio.get_event_loop().run_in_executor(None, run_evaluation),
+        run_evaluation,
         "interval",
         minutes=settings.eval_interval_minutes,
         id="hourly_eval",
@@ -44,12 +50,14 @@ async def main() -> None:
         coalesce=True,
     )
     scheduler.add_job(
-        lambda: asyncio.get_event_loop().run_in_executor(None, purge_old_findings),
+        purge_old_findings,
         "cron", hour=3, minute=30, id="retention_purge",
     )
     scheduler.start()
-    log.info("scheduler started: evaluate every %d min, retention %d days",
-             settings.eval_interval_minutes, settings.retention_days)
+
+    job = scheduler.get_job("hourly_eval")
+    log.info("scheduler started: evaluate every %d min (next run at %s), retention %d days",
+             settings.eval_interval_minutes, job.next_run_time, settings.retention_days)
 
     # Web server (Uvicorn) as an asyncio task on this same loop.
     config = uvicorn.Config(
