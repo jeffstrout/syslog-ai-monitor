@@ -1,7 +1,6 @@
-"""Claude Haiku evaluation of a log digest using structured JSON output."""
+"""Claude Haiku evaluation of a log digest using structured (tool-call) output."""
 from __future__ import annotations
 
-import json
 import logging
 
 import anthropic
@@ -64,6 +63,15 @@ SYSTEM_PROMPT = (
 )
 
 
+# Structured output via a forced tool call — portable across anthropic SDK
+# versions (works on the pinned SDK, unlike the newer output_config.format).
+REPORT_TOOL = {
+    "name": "report_assessment",
+    "description": "Report the structured assessment of this syslog period.",
+    "input_schema": RESULT_SCHEMA,
+}
+
+
 def evaluate(digest_text: str, stats: dict) -> dict:
     """Send the digest to Haiku and return the validated result dict."""
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
@@ -78,14 +86,20 @@ def evaluate(digest_text: str, stats: dict) -> dict:
         max_tokens=4096,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_content}],
-        output_config={
-            "format": {"type": "json_schema", "schema": RESULT_SCHEMA}
-        },
+        tools=[REPORT_TOOL],
+        tool_choice={"type": "tool", "name": "report_assessment"},
     )
 
-    # With output_config.format the first text block is guaranteed valid JSON.
-    text = next((b.text for b in response.content if b.type == "text"), "{}")
-    result = json.loads(text)
+    # Forcing tool_choice guarantees a tool_use block whose .input is the
+    # schema-validated result (already a dict — no JSON parsing needed).
+    result = next(
+        (b.input for b in response.content
+         if b.type == "tool_use" and b.name == "report_assessment"),
+        None,
+    )
+    if result is None:
+        raise RuntimeError("model did not return the report_assessment tool call")
+
     log.info(
         "evaluation complete: status=%s findings=%d (lines=%s)",
         result.get("overall_status"), len(result.get("findings", [])),
