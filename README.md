@@ -141,8 +141,8 @@ A small JSON API backs it:
 | `GET`  | `/api/history?limit=N` | Recent findings, newest first (default 200) |
 | `GET`/`POST` | `/api/run-now` | Run an evaluation immediately (testing) |
 
-The dashboard footer also links to these (Health, API docs, History/Status JSON)
-and has a **Run evaluation now** button.
+The dashboard's sticky header also links to these (Health, API docs,
+History/Status JSON) and has a **Run evaluation now** button.
 
 **Full API reference:** [`docs/API.md`](docs/API.md) — endpoints, JSON shapes, and
 examples.
