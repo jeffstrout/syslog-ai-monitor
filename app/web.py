@@ -104,13 +104,16 @@ def history(limit: int = 200) -> dict:
     return {"findings": db.list_findings(limit=limit)}
 
 
-@app.post("/api/run-now", tags=["actions"], summary="Evaluate now")
+@app.api_route(
+    "/api/run-now", methods=["POST", "GET"], tags=["actions"], summary="Evaluate now"
+)
 def run_now() -> dict:
     """Trigger an evaluation immediately instead of waiting for the hourly job.
 
     Digests everything currently buffered, sends it to Claude, stores the
     finding, and purges the evaluated raw logs. Useful for testing.
 
+    Accepts **GET or POST** for convenience (so a plain `curl`/browser works).
     Returns `{ "ran": false, "result": null }` if there were no logs to
     evaluate or the model call failed (raw logs are kept on failure), otherwise
     `{ "ran": true, "result": { ...the structured AI result... } }`.

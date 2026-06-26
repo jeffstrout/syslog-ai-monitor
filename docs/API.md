@@ -167,10 +167,12 @@ evaluated raw logs.
 
 - `ran` is `false` (and `result` is `null`) when there were no logs to evaluate,
   or the model call failed. On failure the raw logs are **kept** for the next run.
-- This is a **POST** — a `GET` returns `405 Method Not Allowed`.
+- Accepts **GET or POST** for convenience — a plain `curl` or a browser visit
+  works, as does `curl -X POST`.
 
 ```bash
-curl -X POST http://<pi-ip>:8080/api/run-now
+curl http://<pi-ip>:8080/api/run-now          # GET works
+curl -X POST http://<pi-ip>:8080/api/run-now  # POST also works
 ```
 
 ---

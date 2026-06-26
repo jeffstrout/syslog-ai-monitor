@@ -133,7 +133,7 @@ A small JSON API backs it:
 | `GET`  | `/api/status` | Buffered-log count + latest finding |
 | `GET`  | `/api/latest` | The single most recent finding |
 | `GET`  | `/api/history?limit=N` | Recent findings, newest first (default 200) |
-| `POST` | `/api/run-now` | Run an evaluation immediately (testing) |
+| `GET`/`POST` | `/api/run-now` | Run an evaluation immediately (testing) |
 
 **Full API reference:** [`docs/API.md`](docs/API.md) — endpoints, JSON shapes, and
 examples.
