@@ -19,6 +19,7 @@ a trusted LAN. Base URL: `http://<pi-ip>:8080`.
 | Method | Path | Purpose |
 |---|---|---|
 | `GET`  | `/` | The dashboard (HTML) |
+| `GET`  | `/api/health` | Liveness/health check (200 ok / 503 error) |
 | `GET`  | `/api/status` | Buffered-log count + latest finding |
 | `GET`  | `/api/latest` | The single most recent finding |
 | `GET`  | `/api/history?limit=N` | Recent findings, newest first |
@@ -67,6 +68,32 @@ The structured result returned by Claude.
 ---
 
 ## Endpoints
+
+### `GET /api/health`
+
+Liveness/health check for uptime monitors. Returns `200` when the service and
+database are reachable, `503` otherwise.
+
+**Response (200)**
+
+```json
+{
+  "status": "ok",
+  "version": "1.0.0",
+  "uptime_seconds": 3725,
+  "buffered_logs": 842,
+  "findings_stored": 17,
+  "last_evaluation_ts": 1750896000.0
+}
+```
+
+On failure: `503` with `{ "status": "error", "detail": "..." }`.
+
+```bash
+curl -s http://<pi-ip>:8080/api/health
+```
+
+---
 
 ### `GET /api/status`
 

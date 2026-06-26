@@ -8,6 +8,7 @@ Interactive, auto-generated API docs are available at runtime:
 from __future__ import annotations
 
 import os
+import time
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
@@ -16,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from . import db, evaluator
 
 _STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+_STARTED_AT = time.time()
 
 app = FastAPI(
     title="Syslog AI Monitor",
@@ -35,7 +37,44 @@ app = FastAPI(
 )
 
 
-@app.get("/api/status", tags=["monitoring"], summary="Overview / health")
+@app.get("/api/health", tags=["monitoring"], summary="Health check")
+def health() -> JSONResponse:
+    """Service health for uptime monitors.
+
+    Returns `200` with `{"status": "ok", ...}` when the service and database are
+    reachable, or `503` with `{"status": "error", ...}` if the database can't be
+    queried.
+
+    Example:
+    ```json
+    {
+      "status": "ok",
+      "version": "1.0.0",
+      "uptime_seconds": 3725,
+      "buffered_logs": 842,
+      "findings_stored": 17,
+      "last_evaluation_ts": 1750896000.0
+    }
+    ```
+    """
+    try:
+        latest = db.latest_finding()
+        return JSONResponse({
+            "status": "ok",
+            "version": app.version,
+            "uptime_seconds": round(time.time() - _STARTED_AT),
+            "buffered_logs": db.raw_log_count(),
+            "findings_stored": db.findings_count(),
+            "last_evaluation_ts": latest["ts"] if latest else None,
+        })
+    except Exception as exc:  # database unreachable / corrupt
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "detail": str(exc)},
+        )
+
+
+@app.get("/api/status", tags=["monitoring"], summary="Overview")
 def status() -> dict:
     """Lightweight overview for the dashboard header.
 

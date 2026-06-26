@@ -63,13 +63,37 @@
     border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; background: var(--panel);
   }
   .history-item summary {
-    padding: 12px 16px; cursor: pointer; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+    padding: 12px 16px; cursor: pointer; list-style: none;
   }
   .history-item summary::-webkit-details-marker { display: none; }
-  .history-item .when { color: var(--muted); font-size: 13px; min-width: 160px; }
-  .history-item .sum { flex: 1; }
+  .history-item summary::marker { content: ""; }
+  /* Meta (status + time) on its own row, summary stacked below — reads well
+     on both desktop and narrow mobile screens. */
+  .history-item .hrow {
+    display: flex; gap: 10px; align-items: center; margin-bottom: 6px; flex-wrap: wrap;
+  }
+  .history-item .when { color: var(--muted); font-size: 13px; }
+  .history-item .sum { color: var(--text); line-height: 1.55; }
   .history-body { padding: 0 16px 14px; }
   .empty { color: var(--muted); padding: 20px 0; }
+  footer {
+    max-width: 980px; margin: 8px auto 40px; padding: 18px 24px;
+    border-top: 1px solid var(--line); display: flex; gap: 16px;
+    align-items: center; flex-wrap: wrap;
+  }
+  footer a { color: var(--info); text-decoration: none; font-size: 13px; }
+  footer a:hover { text-decoration: underline; }
+  .runbtn {
+    background: var(--info); color: #04101f; border: none; border-radius: 6px;
+    padding: 8px 14px; cursor: pointer; font-size: 13px; font-weight: 600;
+  }
+  .runbtn:disabled { opacity: .6; cursor: default; }
+  .runmsg { color: var(--muted); font-size: 13px; }
+  @media (max-width: 480px) {
+    header { padding: 14px 16px; }
+    main { padding: 16px; }
+    footer { padding: 16px; gap: 12px; }
+  }
   button.refresh {
     background: var(--panel2); color: var(--text); border: 1px solid var(--line);
     border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 13px;
@@ -92,6 +116,15 @@
   <h3>History</h3>
   <div id="history"><div class="empty">Loading…</div></div>
 </main>
+
+<footer>
+  <button class="runbtn" onclick="runNow(this)">▶ Run evaluation now</button>
+  <span class="runmsg" id="runmsg"></span>
+  <a href="/api/health" target="_blank" rel="noopener">Health</a>
+  <a href="/docs" target="_blank" rel="noopener">API&nbsp;docs</a>
+  <a href="/api/history?limit=200" target="_blank" rel="noopener">History&nbsp;JSON</a>
+  <a href="/api/status" target="_blank" rel="noopener">Status&nbsp;JSON</a>
+</footer>
 
 <script>
 const fmt = (ts) => ts ? new Date(ts * 1000).toLocaleString() : "—";
@@ -144,9 +177,11 @@ function renderHistory(items) {
     const findings = p.findings || [];
     return `<details class="history-item">
       <summary>
-        ${statusPill(p.overall_status)}
-        <span class="when">${fmt(it.ts)}</span>
-        <span class="sum">${esc(p.summary)}</span>
+        <div class="hrow">
+          ${statusPill(p.overall_status)}
+          <span class="when">${fmt(it.ts)}</span>
+        </div>
+        <div class="sum">${esc(p.summary)}</div>
       </summary>
       <div class="history-body">
         ${findings.length ? findings.map(findingHTML).join("")
@@ -171,6 +206,22 @@ async function load() {
   } catch (e) {
     document.getElementById("latest").innerHTML =
       `<div class="banner s-error"><h2>Could not load data</h2><div class="meta">${esc(e)}</div></div>`;
+  }
+}
+
+async function runNow(btn) {
+  const msg = document.getElementById("runmsg");
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = "Running…"; msg.textContent = "Evaluating buffered logs…";
+  try {
+    const r = await fetch("/api/run-now", { method: "POST" }).then(x => x.json());
+    msg.textContent = r.ran ? "Done — results updated below." : "Nothing to evaluate yet.";
+    await load();
+  } catch (e) {
+    msg.textContent = "Failed: " + e;
+  } finally {
+    btn.disabled = false; btn.textContent = orig;
+    setTimeout(() => { msg.textContent = ""; }, 6000);
   }
 }
 

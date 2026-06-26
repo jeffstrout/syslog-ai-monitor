@@ -145,6 +145,11 @@ def list_findings(limit: int = 200) -> list[dict[str, Any]]:
     return [_row_to_finding(r) for r in rows]
 
 
+def findings_count() -> int:
+    with _lock:
+        return _db().execute("SELECT COUNT(*) FROM findings").fetchone()[0]
+
+
 def purge_findings(older_than_ts: float) -> int:
     with _lock:
         cur = _db().execute("DELETE FROM findings WHERE ts < ?", (older_than_ts,))
