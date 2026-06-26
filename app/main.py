@@ -8,9 +8,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from zoneinfo import ZoneInfo
 
 import uvicorn
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 from . import db, syslog_listener
 from .config import settings
@@ -24,6 +27,30 @@ logging.basicConfig(
 log = logging.getLogger("main")
 
 
+def _eval_trigger(minutes: int):
+    """Build a wall-clock-aligned trigger for the evaluation job.
+
+    Aligns to the top of the hour where possible so runs land on clean times
+    (e.g. 9:00, 10:00) rather than drifting from container-start time:
+      - 60 (or any multiple of 60) -> top of the hour, every N hours
+      - a divisor of 60 (30, 20, 15, 10, 5, ...) -> aligned marks each hour
+      - anything else -> plain interval from start (can't align cleanly)
+    Returns (trigger, human_description).
+    """
+    if minutes % 60 == 0:
+        hours = minutes // 60
+        return (
+            CronTrigger(minute=0, hour="*" if hours == 1 else f"*/{hours}"),
+            f"at :00 of every {hours} hour(s)",
+        )
+    if 60 % minutes == 0:
+        return (
+            CronTrigger(minute=f"*/{minutes}"),
+            f"every {minutes} min, aligned to the hour",
+        )
+    return (IntervalTrigger(minutes=minutes), f"every {minutes} min from start")
+
+
 async def main() -> None:
     db.init()
     log.info("database ready at %s", settings.db_path)
@@ -31,33 +58,33 @@ async def main() -> None:
     if not settings.anthropic_api_key:
         log.warning("ANTHROPIC_API_KEY is not set — evaluations will fail")
 
-    # APScheduler: hourly evaluation + nightly retention purge.
-    # Evaluation runs in a thread so the blocking Anthropic call and SQLite
-    # writes don't stall the event loop serving syslog + web.
-    scheduler = AsyncIOScheduler()
+    # APScheduler: top-of-hour evaluation + nightly retention purge.
+    # Use an explicit timezone so "the top of the hour" means local time, not
+    # the container's default (UTC). Cron schedules are wall-clock aligned.
+    tz = ZoneInfo(settings.timezone) if settings.timezone else None
+    scheduler = AsyncIOScheduler(timezone=tz) if tz else AsyncIOScheduler()
+
     # Schedule the functions directly. APScheduler's AsyncIOExecutor runs sync
     # job functions in a thread pool, which is exactly what we want for the
     # blocking Anthropic call + SQLite writes — it keeps them off the event loop
     # that serves syslog + web. (Do NOT wrap these in a lambda that calls
     # asyncio.get_event_loop(): the job runs in a worker thread with no running
     # loop, so that raises and the evaluation silently never happens.)
+    eval_trigger, eval_desc = _eval_trigger(settings.eval_interval_minutes)
     scheduler.add_job(
-        run_evaluation,
-        "interval",
-        minutes=settings.eval_interval_minutes,
-        id="hourly_eval",
-        max_instances=1,
-        coalesce=True,
+        run_evaluation, eval_trigger,
+        id="hourly_eval", max_instances=1, coalesce=True,
     )
     scheduler.add_job(
         purge_old_findings,
-        "cron", hour=3, minute=30, id="retention_purge",
+        CronTrigger(hour=3, minute=30), id="retention_purge",
     )
     scheduler.start()
 
     job = scheduler.get_job("hourly_eval")
-    log.info("scheduler started: evaluate every %d min (next run at %s), retention %d days",
-             settings.eval_interval_minutes, job.next_run_time, settings.retention_days)
+    log.info("scheduler started: evaluate %s (next run %s), retention %d days, tz=%s",
+             eval_desc, job.next_run_time, settings.retention_days,
+             settings.timezone or "system-local")
 
     # Web server (Uvicorn) as an asyncio task on this same loop.
     config = uvicorn.Config(

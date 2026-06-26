@@ -50,6 +50,10 @@ class Settings:
     # Storage
     db_path: str = os.getenv("DB_PATH", "/data/syslog.db").strip()
 
+    # Timezone for scheduling (so evaluations land on the local top-of-hour).
+    # IANA name, e.g. "America/Chicago". Empty = container/system local time.
+    timezone: str = os.getenv("TZ", "").strip()
+
     @property
     def email_enabled(self) -> bool:
         return bool(self.smtp_host and self.alert_to)

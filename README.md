@@ -97,10 +97,15 @@ See [`.env.example`](.env.example) for the full list. The important ones:
 |---|---|---|
 | `ANTHROPIC_API_KEY` | — | **Required.** From console.anthropic.com |
 | `CLAUDE_MODEL` | `claude-haiku-4-5-20251001` | Evaluation model |
-| `EVAL_INTERVAL_MINUTES` | `60` | How often to evaluate |
+| `EVAL_INTERVAL_MINUTES` | `60` | Evaluation cadence. `60` runs at the **top of every hour** (9:00, 10:00). Divisors of 60 (30, 15, …) also align to the hour |
+| `TZ` | `America/Chicago` | Timezone for scheduling + log timestamps. Set to your IANA zone so "top of the hour" means your local time |
 | `RETENTION_DAYS` | `30` | How long findings are kept |
 | `ALERT_MIN_SEVERITY` | `error` | Email when a finding is this severity or higher |
 | `SMTP_HOST` … | — | Leave `SMTP_HOST` blank to disable email |
+
+> **Scheduling:** evaluations run on a wall-clock cron aligned to the hour, so
+> after a reboot or update they still land on clean times (not offset from when
+> the container started). The startup log prints the next scheduled run.
 
 **Email via Gmail:** set `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, your address
 as `SMTP_USER`, and an [App Password](https://myaccount.google.com/apppasswords)
