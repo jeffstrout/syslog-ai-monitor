@@ -16,8 +16,10 @@ from typing import Any
 from .config import settings
 
 # A single connection guarded by a lock keeps this simple and correct for our
-# modest write volume (syslog inserts + one evaluation per hour).
-_lock = threading.Lock()
+# modest write volume (syslog inserts + one evaluation per hour). The lock is
+# re-entrant because helpers acquire it and may call _db() -> init(), which
+# acquires it again (e.g. a request arriving before main.py's init()).
+_lock = threading.RLock()
 _conn: sqlite3.Connection | None = None
 
 

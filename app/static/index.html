@@ -90,6 +90,20 @@
     header { padding: 10px 14px; }
     header h1 { font-size: 16px; }
     main { padding: 16px; }
+    /* Pack header items left; drop the spacer (it scattered links across
+       uneven lines) and the Refresh button (data auto-refreshes). */
+    .hbar .spacer { display: none; }
+    .hbar { gap: 6px 12px; }
+    .meta { font-size: 12px; }
+    .refresh { display: none; }
+    /* Actions become one tidy, swipeable row instead of a ragged wrap. */
+    .hbar.links {
+      margin-top: 10px; gap: 18px;
+      flex-wrap: nowrap; overflow-x: auto;
+      scrollbar-width: none; -webkit-overflow-scrolling: touch;
+    }
+    .hbar.links::-webkit-scrollbar { display: none; }
+    .hbar.links > * { flex: 0 0 auto; }
   }
   button.refresh {
     background: var(--panel2); color: var(--text); border: 1px solid var(--line);
