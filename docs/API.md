@@ -68,6 +68,50 @@ The structured result returned by Claude.
 | `occurrences` | integer | Approx. number of related log lines |
 | `recommendation` | string | Suggested action |
 
+### `weekly_review`
+
+A stored weekly pattern review (kept for `RETENTION_DAYS`).
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | integer | Auto-increment row id |
+| `ts` | number | Unix epoch (seconds) the review ran |
+| `period_start` | number | Epoch of the earliest finding reviewed |
+| `period_end` | number | Epoch of the latest finding reviewed |
+| `window_days` | integer | `WEEKLY_WINDOW_DAYS` used for this review |
+| `finding_count` | integer | Hourly findings rolled up |
+| `payload` | object | The structured review (below) |
+
+### `weekly payload`
+
+| Field | Type | Description |
+|---|---|---|
+| `period_status` | string | `ok` \| `watch` \| `action` |
+| `overall_assessment` | string | 2–4 sentence summary of the period |
+| `recurring_issues` | array of `recurring_issue` | Problems seen across many hours/days |
+| `trends` | array of `trend` | What's new / increasing / steady / decreasing / resolved |
+| `watchlist` | array of string | Things worth keeping an eye on |
+
+### `recurring_issue`
+
+| Field | Type | Description |
+|---|---|---|
+| `severity` | string | `info` \| `warning` \| `error` \| `critical` |
+| `category` | string | e.g. `VPN Connectivity` |
+| `title` | string | Short title |
+| `days_seen` | integer | Distinct days the issue appeared |
+| `frequency` | string | Human description, e.g. `every evening (~18:00)` |
+| `detail` | string | What the pattern is |
+| `recommendation` | string | Suggested action |
+
+### `trend`
+
+| Field | Type | Description |
+|---|---|---|
+| `title` | string | Short title |
+| `direction` | string | `new` \| `increasing` \| `steady` \| `decreasing` \| `resolved` |
+| `detail` | string | What changed over the period |
+
 ---
 
 ## Endpoints
@@ -285,9 +329,10 @@ curl -X POST http://<pi-ip>:8080/api/run-now  # POST also works
 ## Notes
 
 - **No authentication.** Anyone who can reach port 8080 can read findings and
-  trigger `/api/run-now`. Keep it on a trusted network, or front it with a
-  reverse proxy if you need auth.
+  trigger `/api/run-now` or `/api/run-weekly`. Keep it on a trusted network, or
+  front it with a reverse proxy if you need auth.
 - **Timestamps** (`ts`) are Unix epoch seconds (UTC). The dashboard converts
   them to local time in the browser.
-- **Retention.** Findings older than `RETENTION_DAYS` (default 30) are purged by
-  a nightly job; raw logs never persist beyond one evaluation.
+- **Retention.** Findings **and weekly reviews** older than `RETENTION_DAYS`
+  (default 30) are purged by a nightly job; raw logs never persist beyond one
+  evaluation.
