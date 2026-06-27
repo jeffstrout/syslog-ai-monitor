@@ -29,6 +29,12 @@ class Settings:
     eval_interval_minutes: int = _int("EVAL_INTERVAL_MINUTES", 60)
     retention_days: int = _int("RETENTION_DAYS", 30)
 
+    # Weekly pattern review: roll up the last N days of hourly findings to spot
+    # recurring/trending issues. Runs daily over a rolling window so it stays
+    # current. weekly_review_hour is the local hour-of-day (0-23) it runs at.
+    weekly_window_days: int = _int("WEEKLY_WINDOW_DAYS", 7)
+    weekly_review_hour: int = _int("WEEKLY_REVIEW_HOUR", 6)
+
     # Ports
     syslog_port: int = _int("SYSLOG_PORT", 514)
     web_port: int = _int("WEB_PORT", 8080)

@@ -23,7 +23,10 @@ a trusted LAN. Base URL: `http://<pi-ip>:8080`.
 | `GET`  | `/api/status` | Buffered-log count + latest finding |
 | `GET`  | `/api/latest` | The single most recent finding |
 | `GET`  | `/api/history?limit=N` | Recent findings, newest first |
-| `POST` | `/api/run-now` | Run an evaluation immediately |
+| `GET`  | `/api/weekly` | Latest weekly pattern review |
+| `GET`  | `/api/weekly/history?limit=N` | Weekly reviews, newest first |
+| `POST` | `/api/run-now` | Run an hourly evaluation immediately |
+| `POST` | `/api/run-weekly` | Run the weekly pattern review immediately |
 | `GET`  | `/docs`, `/redoc`, `/openapi.json` | Auto-generated API docs |
 
 ---
@@ -64,6 +67,50 @@ The structured result returned by Claude.
 | `evidence` | string | Representative log line(s) |
 | `occurrences` | integer | Approx. number of related log lines |
 | `recommendation` | string | Suggested action |
+
+### `weekly_review`
+
+A stored weekly pattern review (kept for `RETENTION_DAYS`).
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | integer | Auto-increment row id |
+| `ts` | number | Unix epoch (seconds) the review ran |
+| `period_start` | number | Epoch of the earliest finding reviewed |
+| `period_end` | number | Epoch of the latest finding reviewed |
+| `window_days` | integer | `WEEKLY_WINDOW_DAYS` used for this review |
+| `finding_count` | integer | Hourly findings rolled up |
+| `payload` | object | The structured review (below) |
+
+### `weekly payload`
+
+| Field | Type | Description |
+|---|---|---|
+| `period_status` | string | `ok` \| `watch` \| `action` |
+| `overall_assessment` | string | 2–4 sentence summary of the period |
+| `recurring_issues` | array of `recurring_issue` | Problems seen across many hours/days |
+| `trends` | array of `trend` | What's new / increasing / steady / decreasing / resolved |
+| `watchlist` | array of string | Things worth keeping an eye on |
+
+### `recurring_issue`
+
+| Field | Type | Description |
+|---|---|---|
+| `severity` | string | `info` \| `warning` \| `error` \| `critical` |
+| `category` | string | e.g. `VPN Connectivity` |
+| `title` | string | Short title |
+| `days_seen` | integer | Distinct days the issue appeared |
+| `frequency` | string | Human description, e.g. `every evening (~18:00)` |
+| `detail` | string | What the pattern is |
+| `recommendation` | string | Suggested action |
+
+### `trend`
+
+| Field | Type | Description |
+|---|---|---|
+| `title` | string | Short title |
+| `direction` | string | `new` \| `increasing` \| `steady` \| `decreasing` \| `resolved` |
+| `detail` | string | What changed over the period |
 
 ---
 
@@ -180,6 +227,81 @@ curl -s "http://<pi-ip>:8080/api/history?limit=50"
 
 ---
 
+### `GET /api/weekly`
+
+The latest **weekly pattern review** — a rollup of the last `WEEKLY_WINDOW_DAYS`
+(default 7) of findings highlighting recurring issues and trends. Returns the
+object directly, or `null` if none exist yet.
+
+**Response**
+
+```json
+{
+  "id": 4,
+  "ts": 1750896000.0,
+  "period_start": 1750291200.0,
+  "period_end": 1750896000.0,
+  "window_days": 7,
+  "finding_count": 142,
+  "payload": {
+    "period_status": "action",            // ok | watch | action
+    "overall_assessment": "2–4 sentence summary of the period",
+    "recurring_issues": [
+      {
+        "severity": "critical",           // info | warning | error | critical
+        "category": "VPN Connectivity",
+        "title": "OpenVPN client fails nightly",
+        "days_seen": 7,
+        "frequency": "every evening (~18:00)",
+        "detail": "...",
+        "recommendation": "..."
+      }
+    ],
+    "trends": [
+      { "title": "QUIC reassembly warnings",
+        "direction": "increasing",        // new | increasing | steady | decreasing | resolved
+        "detail": "..." }
+    ],
+    "watchlist": ["...", "..."]
+  }
+}
+```
+
+```bash
+curl -s http://<pi-ip>:8080/api/weekly
+```
+
+---
+
+### `GET /api/weekly/history`
+
+Recent weekly reviews, newest first.
+
+**Query params:** `limit` (integer, default `30`).
+
+**Response:** `{ "weekly": [ <weekly review>, ... ] }` — each item matches the
+`/api/weekly` shape.
+
+```bash
+curl -s "http://<pi-ip>:8080/api/weekly/history?limit=10"
+```
+
+---
+
+### `POST /api/run-weekly`
+
+Runs the weekly pattern review immediately instead of waiting for the daily
+schedule (reads stored findings; does not touch raw logs). Accepts **GET or
+POST**. Returns `{ "ran": true, "result": { ...review... } }`, or
+`{ "ran": false, "result": null }` if there were no findings in the window or
+the model call failed.
+
+```bash
+curl -X POST http://<pi-ip>:8080/api/run-weekly
+```
+
+---
+
 ### `POST /api/run-now`
 
 Runs an evaluation immediately instead of waiting for the hourly schedule:
@@ -207,9 +329,10 @@ curl -X POST http://<pi-ip>:8080/api/run-now  # POST also works
 ## Notes
 
 - **No authentication.** Anyone who can reach port 8080 can read findings and
-  trigger `/api/run-now`. Keep it on a trusted network, or front it with a
-  reverse proxy if you need auth.
+  trigger `/api/run-now` or `/api/run-weekly`. Keep it on a trusted network, or
+  front it with a reverse proxy if you need auth.
 - **Timestamps** (`ts`) are Unix epoch seconds (UTC). The dashboard converts
   them to local time in the browser.
-- **Retention.** Findings older than `RETENTION_DAYS` (default 30) are purged by
-  a nightly job; raw logs never persist beyond one evaluation.
+- **Retention.** Findings **and weekly reviews** older than `RETENTION_DAYS`
+  (default 30) are purged by a nightly job; raw logs never persist beyond one
+  evaluation.

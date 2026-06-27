@@ -4,7 +4,8 @@ A lightweight, self-hosted service for a **Raspberry Pi 4B** (or any Linux host)
 
 - **Receives** syslog from a **UniFi UDM Pro** (UDP/TCP port 514; CEF/SIEM format supported),
 - **Evaluates** the accumulated logs **every hour** with **Claude Haiku**, surfacing real errors and anomalies,
-- **Shows** the latest status and a 30-day history in a small **web dashboard**,
+- **Reviews patterns** over the last 7 days daily — recurring issues and trends a single hour can't reveal,
+- **Shows** the latest status, the weekly pattern review, and a 30-day history in a small **web dashboard**,
 - **Emails** you when something needs attention,
 - **Discards raw logs** after each evaluation — only the AI findings are kept.
 
@@ -43,6 +44,24 @@ The model is also **tuned to treat routine UniFi internal chatter as benign**
 messages, wireless retry telemetry, transient ARP/NTP blips, etc.), so
 `error`/`warning` status reflects things that actually matter rather than normal
 daemon noise. That guidance lives in the system prompt in `app/claude_client.py`.
+
+### Weekly pattern review
+
+Once a day, a second job rolls up the **last 7 days of hourly findings** and asks
+Claude to find what a single hour can't show: **recurring issues** (e.g. a VPN that
+fails every evening), **trends** (something new, increasing, steady, or resolved),
+and a short **watchlist**. It reads the stored findings (not raw logs), aggregates
+how many days/hours each issue appeared, and returns a structured summary shown on
+the dashboard above the history. Window and run-time are configurable.
+
+```
+findings (last 7 days) ──▶ aggregate by issue (days/hours/occurrences)
+                                  │  daily (APScheduler cron)
+                                  ▼
+                            Claude Haiku ──▶ recurring issues + trends + watchlist
+                                  │
+                       weekly_summaries table ──▶ dashboard "Last 7 days — patterns"
+```
 
 ---
 
@@ -99,6 +118,8 @@ See [`.env.example`](.env.example) for the full list. The important ones:
 | `CLAUDE_MODEL` | `claude-haiku-4-5-20251001` | Evaluation model |
 | `EVAL_INTERVAL_MINUTES` | `60` | Evaluation cadence. `60` runs at the **top of every hour** (9:00, 10:00). Divisors of 60 (30, 15, …) also align to the hour |
 | `TZ` | `America/Chicago` | Timezone for scheduling + log timestamps. Set to your IANA zone so "top of the hour" means your local time |
+| `WEEKLY_WINDOW_DAYS` | `7` | How many days of findings the pattern review rolls up |
+| `WEEKLY_REVIEW_HOUR` | `6` | Local hour (0–23) the weekly review runs each day |
 | `RETENTION_DAYS` | `30` | How long findings are kept |
 | `ALERT_MIN_SEVERITY` | `error` | Email when a finding is this severity or higher |
 | `SMTP_HOST` … | — | Leave `SMTP_HOST` blank to disable email |
@@ -127,9 +148,9 @@ input / output tokens, and each digest is a few thousand tokens.
 
 ## Web dashboard & API
 
-The dashboard (`http://<pi-ip>:8080/`) shows the latest evaluation and history and
-auto-refreshes every minute. It's open on your LAN with no login — intended for a
-trusted home network.
+The dashboard (`http://<pi-ip>:8080/`) shows the latest hourly evaluation, the
+**7-day pattern review**, and the finding history, and auto-refreshes every minute.
+It's open on your LAN with no login — intended for a trusted home network.
 
 A small JSON API backs it:
 
@@ -139,10 +160,14 @@ A small JSON API backs it:
 | `GET`  | `/api/status` | Buffered-log count + latest finding |
 | `GET`  | `/api/latest` | The single most recent finding |
 | `GET`  | `/api/history?limit=N` | Recent findings, newest first (default 200) |
-| `GET`/`POST` | `/api/run-now` | Run an evaluation immediately (testing) |
+| `GET`  | `/api/weekly` | Latest weekly pattern review |
+| `GET`  | `/api/weekly/history?limit=N` | Weekly reviews, newest first (default 30) |
+| `GET`/`POST` | `/api/run-now` | Run an hourly evaluation immediately (testing) |
+| `GET`/`POST` | `/api/run-weekly` | Run the weekly pattern review immediately (testing) |
 
-The dashboard's sticky header also links to these (Health, API docs,
-History/Status JSON) and has a **Run evaluation now** button.
+The dashboard's sticky header links to these (Health, API docs, History/Weekly/
+Status JSON) and has a **Run evaluation now** button; the patterns section has its
+own **Run weekly review** button.
 
 **Full API reference:** [`docs/API.md`](docs/API.md) — endpoints, JSON shapes, and
 examples.
@@ -176,10 +201,10 @@ git pull && docker compose up -d --build
 
 **Restarts & power loss:** the container runs with `restart: unless-stopped` and
 Docker starts on boot, so the stack **comes back automatically after a reboot** —
-no commands needed. Your finding **history persists** across reboots and rebuilds
-because the SQLite database lives on the `syslog-data` Docker volume. (Raw logs are
-never kept beyond one evaluation.) On a Raspberry Pi, a hard power cut can corrupt
-the SD card — a small UPS is worthwhile for a 24/7 deployment.
+no commands needed. Your finding **and weekly-review history persist** across
+reboots and rebuilds because the SQLite database lives on the `syslog-data` Docker
+volume. (Raw logs are never kept beyond one evaluation.) On a Raspberry Pi, a hard
+power cut can corrupt the SD card — a small UPS is worthwhile for a 24/7 deployment.
 
 ---
 
@@ -191,8 +216,11 @@ Send a test log line and trigger an evaluation manually:
 # send a fake syslog line to the Pi (from any machine on the LAN)
 logger -n <pi-ip> -P 514 -d "test critical error: WAN link down"
 
-# force an evaluation now
+# force an hourly evaluation now
 curl -X POST http://<pi-ip>:8080/api/run-now
+
+# force the weekly pattern review now (rolls up stored findings)
+curl -X POST http://<pi-ip>:8080/api/run-weekly
 ```
 
 ---
@@ -214,13 +242,13 @@ DB_PATH=./syslog.db SYSLOG_PORT=5514 python -m app.main
 
 ```
 app/
-  main.py              entrypoint — listener + scheduler + web server
+  main.py              entrypoint — listener + scheduler (hourly/weekly/purge) + web
   config.py            env-driven settings
-  db.py                SQLite: raw_logs (ephemeral) + findings (history)
+  db.py                SQLite: raw_logs (ephemeral) + findings + weekly_summaries
   syslog_listener.py   asyncio UDP/TCP :514, RFC 3164/5424 + CEF parsing
   preprocess.py        token masking, grouping, digest builder
-  claude_client.py     Haiku call (forced-tool structured output) + noise-tuned prompt
-  evaluator.py         hourly job: digest → Claude → store → purge raw
+  claude_client.py     Haiku calls (hourly eval + weekly review) w/ structured output
+  evaluator.py         hourly evaluation + weekly pattern review jobs
   alerts.py            SMTP email on error/critical findings
   web.py               FastAPI routes + JSON API
   static/index.html    dashboard (no build step)

@@ -17,7 +17,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from . import db, syslog_listener
 from .config import settings
-from .evaluator import purge_old_findings, run_evaluation
+from .evaluator import purge_old_findings, run_evaluation, run_weekly_review
 from .web import app
 
 logging.basicConfig(
@@ -75,6 +75,12 @@ async def main() -> None:
         run_evaluation, eval_trigger,
         id="hourly_eval", max_instances=1, coalesce=True,
     )
+    # Weekly pattern review — daily at WEEKLY_REVIEW_HOUR over a rolling window.
+    scheduler.add_job(
+        run_weekly_review,
+        CronTrigger(hour=settings.weekly_review_hour, minute=0),
+        id="weekly_review", max_instances=1, coalesce=True,
+    )
     scheduler.add_job(
         purge_old_findings,
         CronTrigger(hour=3, minute=30), id="retention_purge",
@@ -82,9 +88,13 @@ async def main() -> None:
     scheduler.start()
 
     job = scheduler.get_job("hourly_eval")
+    wk = scheduler.get_job("weekly_review")
     log.info("scheduler started: evaluate %s (next run %s), retention %d days, tz=%s",
              eval_desc, job.next_run_time, settings.retention_days,
              settings.timezone or "system-local")
+    log.info("weekly pattern review: %d-day window, daily at %02d:00 (next run %s)",
+             settings.weekly_window_days, settings.weekly_review_hour,
+             wk.next_run_time)
 
     # Web server (Uvicorn) as an asyncio task on this same loop.
     config = uvicorn.Config(

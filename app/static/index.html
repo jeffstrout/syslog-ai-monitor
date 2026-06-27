@@ -111,6 +111,19 @@
   }
   button.refresh:hover { background: var(--line); }
   code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  /* Weekly pattern section */
+  .weekly-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .runbtn.small { font-size: 12px; padding: 5px 11px; }
+  .subhead { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 16px 0 8px; }
+  .trend { padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; line-height: 1.5; }
+  .trend:last-child { border-bottom: none; }
+  .dir { font-weight: 700; font-size: 11px; padding: 1px 7px; border-radius: 4px; margin-right: 8px; white-space: nowrap; }
+  .dir-new { background: rgba(9,105,218,.15); color: var(--info); }
+  .dir-increasing { background: rgba(207,34,46,.15); color: var(--error); }
+  .dir-steady { background: rgba(89,99,110,.15); color: var(--muted); }
+  .dir-decreasing, .dir-resolved { background: rgba(26,127,55,.15); color: var(--ok); }
+  .watchlist { margin: 6px 0 0; padding-left: 20px; }
+  .watchlist li { margin: 5px 0; }
 </style>
 </head>
 <body>
@@ -129,12 +142,21 @@
     <a href="/api/health" target="_blank" rel="noopener">Health</a>
     <a href="/docs" target="_blank" rel="noopener">API&nbsp;docs</a>
     <a href="/api/history?limit=200" target="_blank" rel="noopener">History&nbsp;JSON</a>
+    <a href="/api/weekly" target="_blank" rel="noopener">Weekly&nbsp;JSON</a>
     <a href="/api/status" target="_blank" rel="noopener">Status&nbsp;JSON</a>
   </div>
 </header>
 
 <main>
   <div id="latest"></div>
+
+  <h3 class="weekly-head">
+    Last 7 days — patterns
+    <button class="runbtn small" onclick="runWeekly(this)">▶ Run weekly review</button>
+    <span class="runmsg" id="weeklymsg"></span>
+  </h3>
+  <div id="weekly"><div class="empty">Loading…</div></div>
+
   <h3>History</h3>
   <div id="history"><div class="empty">Loading…</div></div>
 </main>
@@ -182,6 +204,53 @@ function statusPill(status) {
   return `<span class="pill status-${esc(s)}">${esc(s)}</span>`;
 }
 
+// Weekly period_status (ok|watch|action) reuses the hourly status colors.
+const WEEKLY_COLOR = { action: "error", watch: "warning", ok: "ok" };
+
+function recurringHTML(r) {
+  const sev = (r.severity || "info").toLowerCase();
+  return `<div class="finding">
+    <div class="top">
+      <span class="sev sev-${esc(sev)}">${esc(sev)}</span>
+      <span class="title">${esc(r.title)}</span>
+      <span class="cat">${esc(r.category)} · ${esc(r.days_seen)} day(s) · ${esc(r.frequency)}</span>
+    </div>
+    <div class="detail">${esc(r.detail)}</div>
+    ${r.recommendation ? `<div class="rec">→ ${esc(r.recommendation)}</div>` : ""}
+  </div>`;
+}
+
+function trendHTML(t) {
+  const d = (t.direction || "steady").toLowerCase();
+  const label = {new:"NEW", increasing:"▲ UP", steady:"= STEADY",
+                 decreasing:"▼ DOWN", resolved:"✓ RESOLVED"}[d] || d;
+  return `<div class="trend"><span class="dir dir-${esc(d)}">${esc(label)}</span><b>${esc(t.title)}</b> — ${esc(t.detail)}</div>`;
+}
+
+function renderWeekly(w) {
+  const el = document.getElementById("weekly");
+  if (!w) {
+    el.innerHTML = `<div class="empty">No weekly review yet. It runs once a day over the last few days of findings — or click “Run weekly review” above.</div>`;
+    return;
+  }
+  const p = w.payload || {};
+  const s = (p.period_status || "ok").toLowerCase();
+  const color = WEEKLY_COLOR[s] || "ok";
+  const recurring = p.recurring_issues || [];
+  const trends = p.trends || [];
+  const watch = p.watchlist || [];
+  el.innerHTML = `
+    <div class="banner s-${esc(color)}">
+      <h2>${esc(w.window_days)}-day review <span class="pill status-${esc(color)}">${esc(s)}</span></h2>
+      <div>${esc(p.overall_assessment)}</div>
+      <div class="meta" style="margin-top:6px">${esc(w.finding_count)} hourly evaluations reviewed · ${fmt(w.period_start)} → ${fmt(w.period_end)} · reviewed ${fmt(w.ts)}</div>
+    </div>
+    ${recurring.length ? `<div class="subhead">Recurring issues</div>${recurring.map(recurringHTML).join("")}` : ""}
+    ${trends.length ? `<div class="subhead">Trends</div>${trends.map(trendHTML).join("")}` : ""}
+    ${watch.length ? `<div class="subhead">Watchlist</div><ul class="watchlist">${watch.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+    ${(!recurring.length && !trends.length && !watch.length) ? `<div class="empty">No notable patterns this period. ✅</div>` : ""}`;
+}
+
 function renderHistory(items) {
   const el = document.getElementById("history");
   if (!items.length) { el.innerHTML = `<div class="empty">No history yet.</div>`; return; }
@@ -206,15 +275,17 @@ function renderHistory(items) {
 
 async function load() {
   try {
-    const [statusRes, histRes] = await Promise.all([
+    const [statusRes, histRes, weeklyRes] = await Promise.all([
       fetch("/api/status").then(r => r.json()),
       fetch("/api/history?limit=200").then(r => r.json()),
+      fetch("/api/weekly").then(r => r.json()),
     ]);
     renderLatest(statusRes.latest);
     document.getElementById("buffered").textContent =
       `${statusRes.buffered_logs} logs buffered`;
     document.getElementById("headStatus").innerHTML =
       statusRes.latest ? statusPill((statusRes.latest.payload || {}).overall_status) : "";
+    renderWeekly(weeklyRes);
     renderHistory(histRes.findings || []);
   } catch (e) {
     document.getElementById("latest").innerHTML =
@@ -229,6 +300,22 @@ async function runNow(btn) {
   try {
     const r = await fetch("/api/run-now", { method: "POST" }).then(x => x.json());
     msg.textContent = r.ran ? "Done — results updated below." : "Nothing to evaluate yet.";
+    await load();
+  } catch (e) {
+    msg.textContent = "Failed: " + e;
+  } finally {
+    btn.disabled = false; btn.textContent = orig;
+    setTimeout(() => { msg.textContent = ""; }, 6000);
+  }
+}
+
+async function runWeekly(btn) {
+  const msg = document.getElementById("weeklymsg");
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = "Reviewing…"; msg.textContent = "Reviewing recent findings…";
+  try {
+    const r = await fetch("/api/run-weekly", { method: "POST" }).then(x => x.json());
+    msg.textContent = r.ran ? "Done — patterns updated below." : "No findings to review yet.";
     await load();
   } catch (e) {
     msg.textContent = "Failed: " + e;

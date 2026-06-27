@@ -161,6 +161,52 @@ def run_now() -> dict:
     return {"ran": result is not None, "result": result}
 
 
+@app.get("/api/weekly", tags=["monitoring"], summary="Latest weekly pattern review")
+def weekly() -> JSONResponse:
+    """Return the most recent weekly pattern review, or `null` if none exist.
+
+    Shape:
+    ```json
+    {
+      "id": 4, "ts": 1750896000.0,
+      "period_start": 1750291200.0, "period_end": 1750896000.0,
+      "window_days": 7, "finding_count": 142,
+      "payload": {
+        "period_status": "action",
+        "overall_assessment": "...",
+        "recurring_issues": [ {"title": "...", "category": "...",
+          "severity": "critical", "days_seen": 7, "frequency": "nightly",
+          "detail": "...", "recommendation": "..."} ],
+        "trends": [ {"title": "...", "direction": "increasing", "detail": "..."} ],
+        "watchlist": ["..."]
+      }
+    }
+    ```
+    """
+    return JSONResponse(db.latest_weekly())
+
+
+@app.get("/api/weekly/history", tags=["monitoring"], summary="Weekly review history")
+def weekly_history(limit: int = 30) -> dict:
+    """Return recent weekly pattern reviews, newest first (default 30)."""
+    return {"weekly": db.list_weekly(limit=limit)}
+
+
+@app.api_route(
+    "/api/run-weekly", methods=["POST", "GET"], tags=["actions"],
+    summary="Run weekly review now",
+)
+def run_weekly() -> dict:
+    """Run the weekly pattern review immediately (rolling `WEEKLY_WINDOW_DAYS`).
+
+    Accepts GET or POST. Returns `{ "ran": false, "result": null }` if there
+    were no findings in the window or the model call failed, otherwise
+    `{ "ran": true, "result": { ...the structured review... } }`.
+    """
+    result = evaluator.run_weekly_review()
+    return {"ran": result is not None, "result": result}
+
+
 @app.get("/", tags=["ui"], summary="Dashboard", include_in_schema=False)
 def index() -> FileResponse:
     return FileResponse(os.path.join(_STATIC_DIR, "index.html"))
