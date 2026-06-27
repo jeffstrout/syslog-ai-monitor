@@ -57,6 +57,17 @@ def init() -> None:
                 payload_json    TEXT NOT NULL      -- full structured result
             );
             CREATE INDEX IF NOT EXISTS idx_findings_ts ON findings(ts);
+
+            CREATE TABLE IF NOT EXISTS weekly_summaries (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts              REAL NOT NULL,     -- unix epoch of the review
+                period_start    REAL NOT NULL,     -- window start (epoch)
+                period_end      REAL NOT NULL,     -- window end (epoch)
+                window_days     INTEGER NOT NULL,
+                finding_count   INTEGER NOT NULL,  -- hourly findings reviewed
+                payload_json    TEXT NOT NULL      -- full structured result
+            );
+            CREATE INDEX IF NOT EXISTS idx_weekly_ts ON weekly_summaries(ts);
             """
         )
         _conn.commit()
@@ -152,8 +163,70 @@ def findings_count() -> int:
         return _db().execute("SELECT COUNT(*) FROM findings").fetchone()[0]
 
 
+def fetch_findings_since(since_ts: float) -> list[dict[str, Any]]:
+    """Return findings with ts >= since (oldest first) for the weekly review."""
+    with _lock:
+        rows = _db().execute(
+            "SELECT * FROM findings WHERE ts >= ? ORDER BY ts", (since_ts,)
+        ).fetchall()
+    return [_row_to_finding(r) for r in rows]
+
+
 def purge_findings(older_than_ts: float) -> int:
     with _lock:
         cur = _db().execute("DELETE FROM findings WHERE ts < ?", (older_than_ts,))
+        _db().commit()
+        return cur.rowcount
+
+
+# ── weekly_summaries ────────────────────────────────────────────────────────
+
+def insert_weekly(period_start: float, period_end: float, window_days: int,
+                  finding_count: int, payload: dict[str, Any]) -> int:
+    with _lock:
+        cur = _db().execute(
+            "INSERT INTO weekly_summaries "
+            "(ts, period_start, period_end, window_days, finding_count, payload_json) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (time.time(), period_start, period_end, window_days, finding_count,
+             json.dumps(payload)),
+        )
+        _db().commit()
+        return int(cur.lastrowid)
+
+
+def _row_to_weekly(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "ts": row["ts"],
+        "period_start": row["period_start"],
+        "period_end": row["period_end"],
+        "window_days": row["window_days"],
+        "finding_count": row["finding_count"],
+        "payload": json.loads(row["payload_json"]),
+    }
+
+
+def latest_weekly() -> dict[str, Any] | None:
+    with _lock:
+        row = _db().execute(
+            "SELECT * FROM weekly_summaries ORDER BY ts DESC LIMIT 1"
+        ).fetchone()
+    return _row_to_weekly(row) if row else None
+
+
+def list_weekly(limit: int = 30) -> list[dict[str, Any]]:
+    with _lock:
+        rows = _db().execute(
+            "SELECT * FROM weekly_summaries ORDER BY ts DESC LIMIT ?", (limit,)
+        ).fetchall()
+    return [_row_to_weekly(r) for r in rows]
+
+
+def purge_weekly(older_than_ts: float) -> int:
+    with _lock:
+        cur = _db().execute(
+            "DELETE FROM weekly_summaries WHERE ts < ?", (older_than_ts,)
+        )
         _db().commit()
         return cur.rowcount

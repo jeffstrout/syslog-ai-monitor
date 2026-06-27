@@ -23,7 +23,10 @@ a trusted LAN. Base URL: `http://<pi-ip>:8080`.
 | `GET`  | `/api/status` | Buffered-log count + latest finding |
 | `GET`  | `/api/latest` | The single most recent finding |
 | `GET`  | `/api/history?limit=N` | Recent findings, newest first |
-| `POST` | `/api/run-now` | Run an evaluation immediately |
+| `GET`  | `/api/weekly` | Latest weekly pattern review |
+| `GET`  | `/api/weekly/history?limit=N` | Weekly reviews, newest first |
+| `POST` | `/api/run-now` | Run an hourly evaluation immediately |
+| `POST` | `/api/run-weekly` | Run the weekly pattern review immediately |
 | `GET`  | `/docs`, `/redoc`, `/openapi.json` | Auto-generated API docs |
 
 ---
@@ -176,6 +179,81 @@ Returns recent findings, newest first.
 
 ```bash
 curl -s "http://<pi-ip>:8080/api/history?limit=50"
+```
+
+---
+
+### `GET /api/weekly`
+
+The latest **weekly pattern review** — a rollup of the last `WEEKLY_WINDOW_DAYS`
+(default 7) of findings highlighting recurring issues and trends. Returns the
+object directly, or `null` if none exist yet.
+
+**Response**
+
+```json
+{
+  "id": 4,
+  "ts": 1750896000.0,
+  "period_start": 1750291200.0,
+  "period_end": 1750896000.0,
+  "window_days": 7,
+  "finding_count": 142,
+  "payload": {
+    "period_status": "action",            // ok | watch | action
+    "overall_assessment": "2–4 sentence summary of the period",
+    "recurring_issues": [
+      {
+        "severity": "critical",           // info | warning | error | critical
+        "category": "VPN Connectivity",
+        "title": "OpenVPN client fails nightly",
+        "days_seen": 7,
+        "frequency": "every evening (~18:00)",
+        "detail": "...",
+        "recommendation": "..."
+      }
+    ],
+    "trends": [
+      { "title": "QUIC reassembly warnings",
+        "direction": "increasing",        // new | increasing | steady | decreasing | resolved
+        "detail": "..." }
+    ],
+    "watchlist": ["...", "..."]
+  }
+}
+```
+
+```bash
+curl -s http://<pi-ip>:8080/api/weekly
+```
+
+---
+
+### `GET /api/weekly/history`
+
+Recent weekly reviews, newest first.
+
+**Query params:** `limit` (integer, default `30`).
+
+**Response:** `{ "weekly": [ <weekly review>, ... ] }` — each item matches the
+`/api/weekly` shape.
+
+```bash
+curl -s "http://<pi-ip>:8080/api/weekly/history?limit=10"
+```
+
+---
+
+### `POST /api/run-weekly`
+
+Runs the weekly pattern review immediately instead of waiting for the daily
+schedule (reads stored findings; does not touch raw logs). Accepts **GET or
+POST**. Returns `{ "ran": true, "result": { ...review... } }`, or
+`{ "ran": false, "result": null }` if there were no findings in the window or
+the model call failed.
+
+```bash
+curl -X POST http://<pi-ip>:8080/api/run-weekly
 ```
 
 ---

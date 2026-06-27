@@ -127,3 +127,121 @@ def evaluate(digest_text: str, stats: dict) -> dict:
         stats.get("total_lines"),
     )
     return result
+
+
+# ── Weekly pattern review ───────────────────────────────────────────────────
+
+WEEKLY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "period_status": {"type": "string", "enum": ["ok", "watch", "action"]},
+        "overall_assessment": {"type": "string"},
+        "recurring_issues": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "category": {"type": "string"},
+                    "severity": {
+                        "type": "string",
+                        "enum": ["info", "warning", "error", "critical"],
+                    },
+                    "days_seen": {"type": "integer"},
+                    "frequency": {"type": "string"},
+                    "detail": {"type": "string"},
+                    "recommendation": {"type": "string"},
+                },
+                "required": [
+                    "title", "category", "severity", "days_seen",
+                    "frequency", "detail", "recommendation",
+                ],
+                "additionalProperties": False,
+            },
+        },
+        "trends": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "direction": {
+                        "type": "string",
+                        "enum": ["new", "increasing", "steady", "decreasing", "resolved"],
+                    },
+                    "detail": {"type": "string"},
+                },
+                "required": ["title", "direction", "detail"],
+                "additionalProperties": False,
+            },
+        },
+        "watchlist": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": [
+        "period_status", "overall_assessment",
+        "recurring_issues", "trends", "watchlist",
+    ],
+    "additionalProperties": False,
+}
+
+WEEKLY_TOOL = {
+    "name": "report_weekly_review",
+    "description": "Report the multi-day pattern review of the syslog findings.",
+    "input_schema": WEEKLY_SCHEMA,
+}
+
+WEEKLY_SYSTEM_PROMPT = (
+    "You are a network operations analyst reviewing several days of hourly "
+    "assessments of a home network's UniFi UDM Pro. Each hour, an AI already "
+    "summarized that hour's syslog and listed any findings; you are now given a "
+    "rollup of those hourly summaries and findings across the whole period.\n\n"
+    "Your job is to find PATTERNS that a single hour can't reveal:\n"
+    "  - Recurring issues: the same problem appearing across many hours or days "
+    "(e.g. a VPN that fails every evening, DPI socket errors several times a "
+    "day). Note how many distinct days it was seen and roughly how often.\n"
+    "  - Trends: something new this period, getting more frequent, steady, "
+    "improving, or resolved.\n"
+    "  - A short watchlist: a few concrete things worth keeping an eye on.\n\n"
+    "Focus on what is actionable or worth attention. Do NOT re-report one-off, "
+    "benign, or routine items that appeared in a single hour and never recurred "
+    "— those are noise at this altitude. A genuine recurring failure (like a VPN "
+    "certificate loop) matters even if each hour individually looked minor.\n\n"
+    "Set period_status to 'action' if something needs attention this week, "
+    "'watch' for things worth monitoring, and 'ok' if the period was healthy "
+    "with only routine noise. Keep the overall_assessment to 2-4 sentences. If "
+    "there are no real patterns, return empty recurring_issues/trends and 'ok'."
+)
+
+
+def review_week(digest_text: str, stats: dict) -> dict:
+    """Send the multi-day findings rollup to Haiku and return the result dict."""
+    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+
+    user_content = (
+        f"Here is the rollup of hourly assessments for the review period.\n\n"
+        f"{digest_text}"
+    )
+
+    response = client.messages.create(
+        model=settings.model,
+        max_tokens=4096,
+        system=WEEKLY_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_content}],
+        tools=[WEEKLY_TOOL],
+        tool_choice={"type": "tool", "name": "report_weekly_review"},
+    )
+
+    result = next(
+        (b.input for b in response.content
+         if b.type == "tool_use" and b.name == "report_weekly_review"),
+        None,
+    )
+    if result is None:
+        raise RuntimeError("model did not return the report_weekly_review tool call")
+
+    log.info(
+        "weekly review complete: status=%s recurring=%d trends=%d (findings=%s)",
+        result.get("period_status"), len(result.get("recurring_issues", [])),
+        len(result.get("trends", [])), stats.get("finding_count"),
+    )
+    return result
