@@ -169,6 +169,18 @@ history — nothing is written. `alerts.maybe_send_failure` covers that path, an
 `/api/health` reports `status: "degraded"` plus `evaluation.last_success_age_seconds`
 so an external check can see it. Note this is inert unless SMTP is configured.
 
+**The MQTT will must be registered before `connect()`.** A broker only honours a
+Last Will supplied at connection time, and the LWT *is* the feature —
+`app/mqtt_out.py` publishes availability so the broker announces `offline` on
+this box's behalf when it drops. Syslog can't do that (push-only: quiet and dead
+look identical), and neither can ping (ICMP is answered by the kernel, so a host
+with wholly wedged userspace still replies — as happened here on 2026-07-27).
+
+Two related rules: publishing runs on paho's own thread via `loop_start()`, never
+on the shared event loop; and `publish()` swallows everything, because MQTT must
+never be able to break an evaluation. `mqtt_out` deliberately does **not** import
+`evaluator` — breaker state is passed in — since `evaluator` imports `mqtt_out`.
+
 **The DB lock is re-entrant on purpose.** `db._lock` is an `RLock` because
 helpers acquire it and may call `_db()` → `init()`, which acquires it again
 (e.g. a web request arriving before `main.init()` has run). Downgrading it to a
