@@ -147,9 +147,19 @@ for 8.9 days. The `evaluation` block carries the detail:
   "healthy": false,
   "last_success_age_seconds": 773912,
   "stale_after_seconds": 10800,
-  "backlog_hours": 0.8
+  "backlog_hours": 0.8,
+  "circuit_breaker": {
+    "open": true,
+    "retry_in_seconds": 3142,
+    "consecutive_permanent_failures": 3
+  }
 }
 ```
+
+`circuit_breaker.open` distinguishes **backing off deliberately** from **hung** —
+from the outside both look like "no evaluations for hours". After a permanent
+model error (billing, auth) scheduled runs are skipped until `retry_in_seconds`
+elapses; `POST /api/run-now` bypasses it.
 
 ```bash
 curl -s http://<pi-ip>:8080/api/health

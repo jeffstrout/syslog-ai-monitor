@@ -151,6 +151,18 @@ from never finishing at all. Batch deletion is now by row id
 (`delete_logs_through_id`), not timestamp, because a capped batch must not delete
 rows newer than the ones it evaluated.
 
+**A permanent model error opens a circuit breaker.** `_is_permanent_api_error`
+separates a billing/auth 4xx from a transient blip (429/5xx). On a permanent one,
+`run_evaluation` backs off — doubling from `BREAKER_BACKOFF_BASE_MINUTES` to
+`BREAKER_BACKOFF_MAX_HOURS` — and **skips the fetch and digest entirely** on
+subsequent runs, because those are the expensive half and are guaranteed to be
+wasted. Any success resets it. `run_evaluation(force=True)` bypasses it, which is
+what `/api/run-now` uses so a manual probe always attempts the call.
+
+The check must stay **before** the fetch: putting it after would still pay the
+~90 s of GIL-holding regex work the breaker exists to avoid. The bound is still
+enforced while open, so the breaker can't become a new way for the buffer to grow.
+
 **Evaluation failure must alert on its own.** `alerts.maybe_send` only runs after
 a *successful* evaluation, so a broken model call is invisible in the finding
 history — nothing is written. `alerts.maybe_send_failure` covers that path, and
