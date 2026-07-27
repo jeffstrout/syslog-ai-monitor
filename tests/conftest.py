@@ -19,6 +19,21 @@ import pytest  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
+def reset_module_state():
+    """Clear module-level state that would otherwise leak between tests.
+
+    The circuit breaker and the alert throttle are both module globals — the
+    right design at runtime (a restart is a fine moment to re-probe) but they
+    make test order significant unless reset.
+    """
+    from app import alerts, evaluator
+
+    evaluator._reset_breaker()
+    alerts._last_failure_alert = 0.0
+    yield
+
+
+@pytest.fixture(autouse=True)
 def clean_db():
     """Truncate every table between tests.
 

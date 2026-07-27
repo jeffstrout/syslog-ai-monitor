@@ -85,6 +85,9 @@ def health() -> JSONResponse:
                 "last_success_age_seconds": age,
                 "stale_after_seconds": stale_after,
                 "backlog_hours": round((now - oldest) / 3600, 1) if oldest else 0.0,
+                # Distinguishes "backing off deliberately" from "hung", which
+                # otherwise look identical from outside.
+                "circuit_breaker": evaluator.breaker_state(),
             },
         })
     except Exception as exc:  # database unreachable / corrupt
@@ -190,8 +193,12 @@ def run_now() -> dict:
     Returns `{ "ran": false, "result": null }` if there were no logs to
     evaluate or the model call failed (raw logs are kept on failure), otherwise
     `{ "ran": true, "result": { ...the structured AI result... } }`.
+
+    **Bypasses the circuit breaker.** Asking explicitly is a deliberate probe, so
+    it always attempts the call even while scheduled runs are being skipped —
+    which is how you confirm a billing or auth problem has been resolved.
     """
-    result = evaluator.run_evaluation()
+    result = evaluator.run_evaluation(force=True)
     return {"ran": result is not None, "result": result}
 
 
