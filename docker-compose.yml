@@ -1,15 +1,51 @@
+# Production / Raspberry Pi deploy with hands-off auto-update.
+#
+# The Pi PULLS a prebuilt multi-arch image from GHCR — it never builds from
+# source. Watchtower checks GHCR on an interval and recreates the container when
+# a newer image is published, so merging a PR to main rolls out to the device.
+#
+#   docker compose pull && docker compose up -d     # first run / manual update
+#
+# To build from source instead (development, or a change not yet published):
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 services:
   syslog-ai-monitor:
-    build: .
+    image: ghcr.io/jeffstrout/syslog-ai-monitor:${IMAGE_TAG:-latest}
     container_name: syslog-ai-monitor
     restart: unless-stopped
     env_file: .env
+
+    # Opt this container in to Watchtower auto-updates (scoped by label below).
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+
     ports:
       - "514:514/udp"     # syslog from the UDM Pro
       - "514:514/tcp"     # syslog over TCP (optional)
       - "8080:8080/tcp"   # web dashboard  ->  http://<pi-ip>:8080
     volumes:
+      # NOTE: the volume name must stay `syslog-data` — it holds the finding and
+      # weekly-review history (30 days). Renaming it silently starts an empty DB.
       - syslog-data:/data
+
+  # Auto-updater: polls GHCR for a newer image and recreates the container in
+  # place. Only touches containers labelled watchtower.enable=true.
+  watchtower:
+    image: containrrr/watchtower
+    container_name: syslog-ai-monitor-watchtower
+    restart: unless-stopped
+    volumes:
+      # Root-equivalent on the host — acceptable on a dedicated device Pi.
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      # Watchtower otherwise negotiates an ancient Docker API version (1.25)
+      # that modern Docker Engine rejects, silently breaking update checks —
+      # the container keeps running and reports no error, it just stops
+      # updating. 1.40 is the daemon's minimum, so it is safely in range.
+      DOCKER_API_VERSION: ${DOCKER_API_VERSION:-1.40}
+      WATCHTOWER_POLL_INTERVAL: ${WATCHTOWER_POLL_INTERVAL:-1200}  # ~20 min
+      WATCHTOWER_LABEL_ENABLE: "true"   # only update opted-in containers
+      WATCHTOWER_CLEANUP: "true"        # prune old images (saves SD-card space)
 
 volumes:
   syslog-data:

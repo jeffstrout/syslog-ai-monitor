@@ -20,6 +20,7 @@ a trusted LAN. Base URL: `http://<pi-ip>:8080`.
 |---|---|---|
 | `GET`  | `/` | The dashboard (HTML) |
 | `GET`  | `/api/health` | Liveness/health check (200 ok / 503 error) |
+| `GET`  | `/api/version` | Running build (`commit`, `built_at`) |
 | `GET`  | `/api/status` | Buffered-log count + latest finding |
 | `GET`  | `/api/latest` | The single most recent finding |
 | `GET`  | `/api/history?limit=N` | Recent findings, newest first |
@@ -136,8 +137,38 @@ database are reachable, `503` otherwise.
 
 On failure: `503` with `{ "status": "error", "detail": "..." }`.
 
+`status` is **`degraded`** when no evaluation has succeeded within three
+intervals. The service is then alive but not doing its job — a plain liveness
+check would call that healthy, which is how a broken model call went unnoticed
+for 8.9 days. The `evaluation` block carries the detail:
+
+```json
+"evaluation": {
+  "healthy": false,
+  "last_success_age_seconds": 773912,
+  "stale_after_seconds": 10800,
+  "backlog_hours": 0.8
+}
+```
+
 ```bash
 curl -s http://<pi-ip>:8080/api/health
+```
+
+---
+
+### `GET /api/version`
+
+The build the container is actually running. Baked in by CI as `APP_COMMIT` /
+`APP_BUILD_TIME`; reads `dev` on a local build. This is the only way to confirm a
+Watchtower auto-update landed.
+
+```json
+{ "commit": "9f3c1a2", "built_at": "2026-07-27T18:04:11Z" }
+```
+
+```bash
+curl -s http://<pi-ip>:8080/api/version
 ```
 
 ---

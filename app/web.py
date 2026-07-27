@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import db, evaluator
 from .config import settings
+from .version import get_version
 
 _STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 _STARTED_AT = time.time()
@@ -74,6 +75,7 @@ def health() -> JSONResponse:
         return JSONResponse({
             "status": "ok" if eval_healthy else "degraded",
             "version": app.version,
+            "commit": get_version()["commit"],
             "uptime_seconds": round(now - _STARTED_AT),
             "buffered_logs": db.raw_log_count(),
             "findings_stored": db.findings_count(),
@@ -90,6 +92,20 @@ def health() -> JSONResponse:
             status_code=503,
             content={"status": "error", "detail": str(exc)},
         )
+
+
+@app.get("/api/version", tags=["monitoring"], summary="Running build")
+def version() -> dict:
+    """Build provenance — which commit this container is actually running.
+
+    Baked in by CI as `APP_COMMIT` / `APP_BUILD_TIME`. This is the only way to
+    confirm a Watchtower auto-update landed, so it reads `dev` on a local build.
+
+    ```json
+    { "commit": "9f3c1a2", "built_at": "2026-07-27T18:04:11Z" }
+    ```
+    """
+    return get_version()
 
 
 @app.get("/api/status", tags=["monitoring"], summary="Overview")
