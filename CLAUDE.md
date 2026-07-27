@@ -170,8 +170,16 @@ endpoint is a genuine change in posture, not a formality.
 - `README.md` — deployment, UDM Pro configuration, `.env` reference.
 - `docs/API.md` — full JSON API reference and payload shapes. FastAPI also
   self-documents at `/docs`, `/redoc`, and `/openapi.json`.
-- `docs/fleet-health-design.md` — **design only, nothing implemented.** A plan to
-  extend this service into Raspberry Pi fleet health monitoring. Worth reading
-  before touching `preprocess.py` or the purge path: it documents why the digest
-  and purge paths block metric collection, and why dead-host detection can't ride
-  on syslog at all. Its code landmarks are accurate as of this writing.
+- **[jeffstrout/homelab-standards](https://github.com/jeffstrout/homelab-standards)**
+  — the shared appliance contract this repo is being brought up to (HTTP
+  endpoints, GHCR + Watchtower deployment, CI/CD workflows, MQTT/Home Assistant
+  conventions, fleet inventory). Fleet-wide design docs moved there because they
+  are not specific to this service:
+  - `docs/fleet-health-design.md` — **design only, nothing implemented.**
+    Worth reading before touching `preprocess.py` or the purge path: it documents
+    why the digest and purge paths block metric collection, and why dead-host
+    detection cannot ride on syslog at all.
+  - `docs/homelab-plan.md` — the fleet architecture and phased plan for turning
+    this service into the manager node.
+
+  Gaps in this repo are tracked in #4.
