@@ -93,23 +93,52 @@ def insert_log(host: str | None, facility: int | None, severity: int | None,
         _db().commit()
 
 
-def fetch_logs_until(cutoff_ts: float) -> list[sqlite3.Row]:
-    """Return all raw logs with ts <= cutoff (the batch to evaluate)."""
+def fetch_logs_until(cutoff_ts: float, limit: int | None = None) -> list[sqlite3.Row]:
+    """Return raw logs with ts <= cutoff (the batch to evaluate), oldest first.
+
+    `limit` caps how many rows one evaluation pulls. Without it a backlog -- which
+    builds whenever the model call keeps failing -- makes every run load the whole
+    table into memory and hold `_lock` for the duration, which blocks the event
+    loop that serves syslog and the web UI.
+    """
+    sql = ("SELECT id, ts, host, facility, severity, message "
+           "FROM raw_logs WHERE ts <= ? ORDER BY ts")
+    params: tuple = (cutoff_ts,)
+    if limit is not None and limit > 0:
+        sql += " LIMIT ?"
+        params = (cutoff_ts, limit)
     with _lock:
-        cur = _db().execute(
-            "SELECT id, ts, host, facility, severity, message "
-            "FROM raw_logs WHERE ts <= ? ORDER BY ts",
-            (cutoff_ts,),
-        )
-        return cur.fetchall()
+        return _db().execute(sql, params).fetchall()
 
 
 def delete_logs_until(cutoff_ts: float) -> int:
-    """Delete the evaluated batch; returns rows removed."""
+    """Delete raw logs at or before a timestamp; returns rows removed.
+
+    Used for the age-based hard bound on the buffer (see evaluator).
+    """
     with _lock:
         cur = _db().execute("DELETE FROM raw_logs WHERE ts <= ?", (cutoff_ts,))
         _db().commit()
         return cur.rowcount
+
+
+def delete_logs_through_id(max_id: int) -> int:
+    """Delete the evaluated batch by row id; returns rows removed.
+
+    Id-based rather than ts-based so a *capped* batch removes exactly what was
+    evaluated, even when several rows share a timestamp.
+    """
+    with _lock:
+        cur = _db().execute("DELETE FROM raw_logs WHERE id <= ?", (max_id,))
+        _db().commit()
+        return cur.rowcount
+
+
+def raw_log_oldest_ts() -> float | None:
+    """Timestamp of the oldest buffered raw log, or None when empty."""
+    with _lock:
+        row = _db().execute("SELECT MIN(ts) FROM raw_logs").fetchone()
+    return row[0] if row and row[0] is not None else None
 
 
 def raw_log_count() -> int:

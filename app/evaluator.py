@@ -27,14 +27,50 @@ def _local_dt(ts: float) -> datetime:
     return datetime.fromtimestamp(ts, tz)
 
 
+def _is_permanent_api_error(exc: Exception) -> bool:
+    """True for model errors that retrying on the next tick cannot fix.
+
+    A 400 "credit balance is too low" or a 401 fails identically every hour, so
+    treating it as a transient blip means retrying forever while the raw-log
+    buffer grows without bound. 429 (rate limit) is excluded — that one *is*
+    worth retrying.
+    """
+    status = getattr(exc, "status_code", None)
+    return isinstance(status, int) and 400 <= status < 500 and status != 429
+
+
+def _enforce_raw_log_bound() -> None:
+    """Drop raw logs older than the hard bound, whatever the evaluation outcome.
+
+    run_evaluation deliberately keeps raw logs when the model call fails so the
+    window isn't lost — but unbounded, that is how 8.9 days of failures became
+    15.9M rows / 5 GB. This caps the damage at RAW_LOG_MAX_AGE_HOURS, trading the
+    oldest unevaluated logs for the service staying responsive.
+    """
+    hours = settings.raw_log_max_age_hours
+    if hours <= 0:
+        return
+    removed = db.delete_logs_until(time.time() - hours * 3600)
+    if removed:
+        log.warning(
+            "raw-log bound: dropped %d unevaluated rows older than %dh",
+            removed, hours,
+        )
+
+
 def run_evaluation() -> dict | None:
     """Evaluate everything buffered up to now. Returns the result, or None if empty."""
     cutoff = time.time()
-    rows = db.fetch_logs_until(cutoff)
+    rows = db.fetch_logs_until(cutoff, limit=settings.eval_max_rows)
 
     if not rows:
         log.info("no logs to evaluate this period")
+        _enforce_raw_log_bound()
         return None
+
+    # Delete by id, not by `cutoff`: when the batch is capped, rows newer than the
+    # last one evaluated are still buffered and must survive.
+    batch_max_id = max(r["id"] for r in rows)
 
     digest_text, stats = build_digest(rows)
     log.info("evaluating %d lines (%d patterns)",
@@ -42,8 +78,17 @@ def run_evaluation() -> dict | None:
 
     try:
         result = claude_client.evaluate(digest_text, stats)
-    except Exception:
-        log.exception("Claude evaluation failed; keeping raw logs for next run")
+    except Exception as exc:
+        permanent = _is_permanent_api_error(exc)
+        log.exception(
+            "Claude evaluation failed (%s); keeping raw logs for next run",
+            "permanent — will not resolve on retry" if permanent else "transient",
+        )
+        # maybe_send() only fires on a *successful* evaluation, so without this the
+        # failure of the model call itself would be entirely silent.
+        alerts.maybe_send_failure(exc, permanent=permanent,
+                                  buffered=db.raw_log_count())
+        _enforce_raw_log_bound()
         return None  # leave raw logs in place so the data isn't lost
 
     db.insert_finding(
@@ -54,8 +99,9 @@ def run_evaluation() -> dict | None:
     )
 
     # Evaluation succeeded and is persisted — drop the raw logs we just processed.
-    deleted = db.delete_logs_until(cutoff)
+    deleted = db.delete_logs_through_id(batch_max_id)
     log.info("stored finding and purged %d raw logs", deleted)
+    _enforce_raw_log_bound()
 
     alerts.maybe_send(result)
     return result

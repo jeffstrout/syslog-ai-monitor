@@ -44,6 +44,15 @@ class Settings:
     digest_max_samples: int = _int("DIGEST_MAX_SAMPLES", 200)
     digest_max_chars: int = _int("DIGEST_MAX_CHARS", 24000)
 
+    # Safety bounds on the raw-log buffer. run_evaluation deliberately KEEPS raw
+    # logs when a model call fails, so the window isn't lost -- but that must be
+    # bounded. With no ceiling, a sustained API failure grew this table to 15.9M
+    # rows / 5 GB over 8.9 days; every run then spent ~41 minutes holding the DB
+    # lock, browning out the dashboard for most of each hour.
+    eval_max_rows: int = _int("EVAL_MAX_ROWS", 500_000)
+    raw_log_max_age_hours: int = _int("RAW_LOG_MAX_AGE_HOURS", 24)
+    alert_failure_cooldown_hours: int = _int("ALERT_FAILURE_COOLDOWN_HOURS", 6)
+
     # Email
     smtp_host: str = os.getenv("SMTP_HOST", "").strip()
     smtp_port: int = _int("SMTP_PORT", 587)
