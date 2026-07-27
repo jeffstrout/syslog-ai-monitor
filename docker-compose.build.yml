@@ -1,0 +1,15 @@
+# Build-from-source override (development, or a change not yet on GHCR).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
+# Layering this over docker-compose.yml replaces the GHCR image with a local
+# build. The Pi should normally NOT use this — it pulls (a Pi builds slowly, and
+# building on the device is what let a fix exist outside version control).
+services:
+  syslog-ai-monitor:
+    build:
+      context: .
+      args:
+        GIT_SHA: dev
+        BUILD_TIME: ""
+    image: syslog-ai-monitor:local

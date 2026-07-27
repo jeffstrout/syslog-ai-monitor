@@ -1,0 +1,6 @@
+# Test-only dependencies. Kept separate so they don't bloat the runtime image.
+-r requirements.txt
+
+pytest
+# starlette's TestClient needs an HTTP client at import time.
+httpx

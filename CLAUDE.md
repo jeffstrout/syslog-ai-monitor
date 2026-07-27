@@ -12,10 +12,16 @@ structured AI findings are retained.
 
 ## Commands
 
-**Run under Docker (the deployment path):**
+**Run under Docker (the deployment path).** The Pi *pulls* from GHCR and
+auto-updates via Watchtower — it does not build:
 ```bash
-docker compose up -d --build
+docker compose pull && docker compose up -d
 docker compose logs -f
+```
+
+**Build from source** (development, or a change not yet published):
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 ```
 
 **Run locally without Docker.** Port 514 needs root, so use a high port:
@@ -36,10 +42,19 @@ curl -X POST http://localhost:8080/api/run-weekly
 Both `run-now` and `run-weekly` accept GET as well as POST, so a browser visit
 works too.
 
-**There is no test suite, linter, formatter, or build step.** Verification is
-manual via the endpoints above plus `docker compose logs -f`. Don't invent
-`pytest`/`make` invocations — if you add tests, you are establishing the
-convention, not following one.
+**Run the tests:**
+```bash
+pip install -r requirements-dev.txt && pytest -q
+```
+
+`tests/conftest.py` points `DB_PATH` at a temp file **before** importing
+anything under `app.` — `config.Settings` is a frozen dataclass whose defaults
+are read from the environment at import time, so it cannot be reconfigured
+afterwards. For the same reason, tests that need different settings swap the
+module reference (`monkeypatch.setattr(evaluator, "settings", ...)`) rather than
+mutating the frozen instance. No test performs a real model call.
+
+There is still **no linter or formatter** — match the surrounding style.
 
 ## Architecture
 
