@@ -53,6 +53,14 @@ class Settings:
     raw_log_max_age_hours: int = _int("RAW_LOG_MAX_AGE_HOURS", 24)
     alert_failure_cooldown_hours: int = _int("ALERT_FAILURE_COOLDOWN_HOURS", 6)
 
+    # Circuit breaker. A permanent model error (billing, auth) cannot clear on
+    # retry, so re-fetching and re-templatizing the whole buffer every hour burns
+    # CPU on work that is guaranteed to fail — and that work is pure-Python regex
+    # in a worker thread, so it starves the event loop while it runs. Back off
+    # instead, doubling from the base up to the cap. Any success resets it.
+    breaker_backoff_base_minutes: int = _int("BREAKER_BACKOFF_BASE_MINUTES", 60)
+    breaker_backoff_max_hours: int = _int("BREAKER_BACKOFF_MAX_HOURS", 6)
+
     # Email
     smtp_host: str = os.getenv("SMTP_HOST", "").strip()
     smtp_port: int = _int("SMTP_PORT", 587)

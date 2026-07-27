@@ -27,6 +27,47 @@ def _local_dt(ts: float) -> datetime:
     return datetime.fromtimestamp(ts, tz)
 
 
+# Circuit-breaker state. Module-level, so it resets on restart — deliberate: a
+# restart is a reasonable moment to re-probe, and persisting it would mean a
+# stale breaker could outlive the problem.
+_breaker_open_until: float = 0.0
+_breaker_consecutive: int = 0
+
+
+def _breaker_backoff_seconds(consecutive: int) -> float:
+    """Double from the base up to the cap: 1h, 2h, 4h, 6h, 6h, …"""
+    base = settings.breaker_backoff_base_minutes * 60
+    cap = settings.breaker_backoff_max_hours * 3600
+    return float(min(base * (2 ** max(0, consecutive - 1)), cap))
+
+
+def _trip_breaker() -> float:
+    """Open the breaker after a permanent failure; returns the delay in seconds."""
+    global _breaker_open_until, _breaker_consecutive
+    _breaker_consecutive += 1
+    delay = _breaker_backoff_seconds(_breaker_consecutive)
+    _breaker_open_until = time.time() + delay
+    return delay
+
+
+def _reset_breaker() -> None:
+    """Any success clears the breaker, so recovery needs no intervention."""
+    global _breaker_open_until, _breaker_consecutive
+    _breaker_open_until = 0.0
+    _breaker_consecutive = 0
+
+
+def breaker_state() -> dict:
+    """Reported by /api/health so an operator can tell a breaker from a hang."""
+    remaining = _breaker_open_until - time.time()
+    is_open = remaining > 0
+    return {
+        "open": is_open,
+        "retry_in_seconds": round(remaining) if is_open else None,
+        "consecutive_permanent_failures": _breaker_consecutive,
+    }
+
+
 def _is_permanent_api_error(exc: Exception) -> bool:
     """True for model errors that retrying on the next tick cannot fix.
 
@@ -58,9 +99,25 @@ def _enforce_raw_log_bound() -> None:
         )
 
 
-def run_evaluation() -> dict | None:
-    """Evaluate everything buffered up to now. Returns the result, or None if empty."""
+def run_evaluation(force: bool = False) -> dict | None:
+    """Evaluate everything buffered up to now. Returns the result, or None if empty.
+
+    `force=True` bypasses the circuit breaker — an explicit manual trigger
+    (`/api/run-now`) is a deliberate probe and should always attempt the call.
+    """
     cutoff = time.time()
+
+    # Skip *before* fetching and digesting: those are the expensive parts, and
+    # while the breaker is open they are guaranteed to be wasted.
+    if not force and _breaker_open_until > cutoff:
+        log.info(
+            "circuit breaker open for another %d min after %d permanent "
+            "failure(s) — skipping fetch and digest",
+            round((_breaker_open_until - cutoff) / 60), _breaker_consecutive,
+        )
+        _enforce_raw_log_bound()
+        return None
+
     rows = db.fetch_logs_until(cutoff, limit=settings.eval_max_rows)
 
     if not rows:
@@ -84,12 +141,24 @@ def run_evaluation() -> dict | None:
             "Claude evaluation failed (%s); keeping raw logs for next run",
             "permanent — will not resolve on retry" if permanent else "transient",
         )
+        if permanent:
+            # Transient errors deliberately do NOT trip the breaker — a 429 or a
+            # 500 should simply retry on the next tick.
+            delay = _trip_breaker()
+            log.warning(
+                "circuit breaker open for %d min; evaluations will be skipped "
+                "until then (use /api/run-now to force an attempt)",
+                round(delay / 60),
+            )
         # maybe_send() only fires on a *successful* evaluation, so without this the
         # failure of the model call itself would be entirely silent.
         alerts.maybe_send_failure(exc, permanent=permanent,
                                   buffered=db.raw_log_count())
         _enforce_raw_log_bound()
         return None  # leave raw logs in place so the data isn't lost
+
+    # The call worked, so whatever was wrong has cleared — recovery is automatic.
+    _reset_breaker()
 
     db.insert_finding(
         overall_status=result.get("overall_status", "ok"),
