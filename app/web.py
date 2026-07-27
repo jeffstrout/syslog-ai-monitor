@@ -15,6 +15,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import db, evaluator
+from .config import settings
 
 _STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 _STARTED_AT = time.time()
@@ -59,13 +60,30 @@ def health() -> JSONResponse:
     """
     try:
         latest = db.latest_finding()
+        now = time.time()
+
+        # An evaluation that keeps failing is invisible in the finding history —
+        # nothing is written when the model call raises. Surfacing the age of the
+        # last success is what lets an external check notice.
+        last_ts = latest["ts"] if latest else None
+        age = round(now - last_ts) if last_ts else None
+        stale_after = settings.eval_interval_minutes * 60 * 3
+        eval_healthy = age is not None and age < stale_after
+
+        oldest = db.raw_log_oldest_ts()
         return JSONResponse({
-            "status": "ok",
+            "status": "ok" if eval_healthy else "degraded",
             "version": app.version,
-            "uptime_seconds": round(time.time() - _STARTED_AT),
+            "uptime_seconds": round(now - _STARTED_AT),
             "buffered_logs": db.raw_log_count(),
             "findings_stored": db.findings_count(),
-            "last_evaluation_ts": latest["ts"] if latest else None,
+            "last_evaluation_ts": last_ts,
+            "evaluation": {
+                "healthy": eval_healthy,
+                "last_success_age_seconds": age,
+                "stale_after_seconds": stale_after,
+                "backlog_hours": round((now - oldest) / 3600, 1) if oldest else 0.0,
+            },
         })
     except Exception as exc:  # database unreachable / corrupt
         return JSONResponse(
