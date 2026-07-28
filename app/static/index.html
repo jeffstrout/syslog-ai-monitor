@@ -4,40 +4,32 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Syslog AI Monitor</title>
-<!-- Shared design tokens (homelab-standards). Vendored, not fetched:
-     the LAN guarantees nothing, including itself. -->
+<!-- Shared design tokens + components (homelab-standards). Vendored, not
+     fetched: the LAN guarantees nothing, including itself. -->
 <link rel="stylesheet" href="/static/tokens.css">
+<link rel="stylesheet" href="/static/components.css">
 <style>
   * { box-sizing: border-box; }
   body {
     margin: 0; font: var(--hl-text-base)/var(--hl-leading) var(--hl-font-sans);
     background: var(--hl-canvas); color: var(--hl-fg);
   }
-  header {
-    position: sticky; top: 0; z-index: 20; background: var(--hl-canvas);
-    padding: 12px 24px; border-bottom: 1px solid var(--hl-border);
+  /* The shell header, its nav, pills and buttons all come from components.css.
+     Only row two -- this appliance's own action bar -- is declared here. The
+     contract allows an app-specific second row; row one is shared.
+
+     Both rows sit inside one sticky wrapper rather than each being sticky, so
+     row two doesn't need to hardcode row one's height as a `top` offset. That
+     number would be wrong the moment the header wraps on a narrow screen. */
+  .shell { position: sticky; top: 0; z-index: 20; }
+  .shell .hl-header { position: static; padding: 12px 24px; }
+  .hbar.links {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 10px 24px; background: var(--hl-surface);
+    border-bottom: 1px solid var(--hl-border);
   }
-  .hbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-  .hbar.links { margin-top: 10px; }
-  .hbar.links a { color: var(--hl-accent); text-decoration: none; font-size: 13px; white-space: nowrap; }
-  .hbar.links a:hover { text-decoration: underline; }
-  header h1 { font-size: 18px; margin: 0; font-weight: 600; }
   .spacer { flex: 1; }
-  .meta { color: var(--hl-fg-muted); font-size: var(--hl-text-sm);
-         font-variant-numeric: tabular-nums; }
-  .pill {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 3px 10px; border-radius: var(--hl-radius-pill);
-    font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em;
-  }
-  /* Redundant with colour on purpose: this is a fault display. */
-  .pill::before {
-    content: ""; width: 6px; height: 6px; border-radius: var(--hl-radius-pill);
-    background: currentColor; flex: none;
-  }
-  .status-ok { background: var(--hl-ok-wash); color: var(--hl-ok); }
-  .status-warning { background: var(--hl-warn-wash); color: var(--hl-warn); }
-  .status-error { background: var(--hl-crit-wash); color: var(--hl-crit); }
+  .meta { color: var(--hl-fg-muted); font-size: var(--hl-text-sm); }
   main { max-width: 980px; margin: 0 auto; padding: 24px; }
   .banner {
     padding: 16px 20px; border-radius: var(--hl-radius-lg); margin-bottom: 24px;
@@ -55,7 +47,7 @@
   .finding .top { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
   .finding .title { font-weight: 600; }
   .sev { padding: 1px 8px; border-radius: var(--hl-radius-sm); font-size: 11px; font-weight: 700; text-transform: uppercase; }
-  .sev-info { background: var(--hl-info-wash); color: var(--hl-accent); }
+  .sev-info { background: var(--hl-info-wash); color: var(--hl-info); }
   .sev-warning { background: var(--hl-warn-wash); color: var(--hl-warn); }
   .sev-error { background: var(--hl-crit-wash); color: var(--hl-crit); }
   .sev-critical { background: var(--hl-crit-wash); color: var(--hl-crit-strong); }
@@ -84,45 +76,36 @@
   .history-item .sum { color: var(--hl-fg); line-height: 1.55; }
   .history-body { padding: 0 16px 14px; }
   .empty { color: var(--hl-fg-muted); padding: 20px 0; }
-  .runbtn {
-    background: var(--hl-accent); color: var(--hl-fg-on-accent); border: none; border-radius: var(--hl-radius);
-    padding: 7px 13px; cursor: pointer; font-size: 13px; font-weight: 600;
-  }
-  .runbtn:disabled { opacity: .6; cursor: default; }
   .runmsg { color: var(--hl-fg-muted); font-size: 13px; }
+  /* Row one's narrow-screen wrap is components.css's job now (560px). Only
+     row two and the page gutter are app concerns. */
   @media (max-width: 480px) {
-    header { padding: 10px 14px; }
-    header h1 { font-size: 16px; }
+    .shell .hl-header { padding: 10px 14px; }
+    .hl-header-name { font-size: 16px; }
     main { padding: 16px; }
-    /* Pack header items left; drop the spacer (it scattered links across
-       uneven lines) and the Refresh button (data auto-refreshes). */
-    .hbar .spacer { display: none; }
-    .hbar { gap: 6px 12px; }
     .meta { font-size: 12px; }
+    /* Refresh goes: the dashboard already polls, and the space is better spent
+       on the action that costs money to run. */
     .refresh { display: none; }
-    /* Actions become one tidy, swipeable row instead of a ragged wrap. */
+    /* Row two becomes one tidy swipeable line instead of a ragged wrap. */
     .hbar.links {
-      margin-top: 10px; gap: 18px;
+      padding: 8px 14px; gap: 18px;
       flex-wrap: nowrap; overflow-x: auto;
       scrollbar-width: none; -webkit-overflow-scrolling: touch;
     }
     .hbar.links::-webkit-scrollbar { display: none; }
     .hbar.links > * { flex: 0 0 auto; }
+    .hbar.links .spacer { display: none; }
   }
-  button.refresh {
-    background: var(--hl-sunken); color: var(--hl-fg); border: 1px solid var(--hl-border);
-    border-radius: var(--hl-radius); padding: 6px 12px; cursor: pointer; font-size: 13px;
-  }
-  button.refresh:hover { background: var(--hl-border); }
   code { font-family: var(--hl-font-mono); }
   /* Weekly pattern section */
   .weekly-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  .runbtn.small { font-size: 12px; padding: 5px 11px; }
+  .hl-btn--sm { font-size: 12px; padding: 5px 11px; min-height: 0; }
   .subhead { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--hl-fg-muted); margin: 16px 0 8px; }
   .trend { padding: 8px 0; border-bottom: 1px solid var(--hl-border); font-size: 14px; line-height: 1.5; }
   .trend:last-child { border-bottom: none; }
   .dir { font-weight: 700; font-size: 11px; padding: 1px 7px; border-radius: var(--hl-radius-sm); margin-right: 8px; white-space: nowrap; }
-  .dir-new { background: var(--hl-info-wash); color: var(--hl-accent); }
+  .dir-new { background: var(--hl-info-wash); color: var(--hl-info); }
   .dir-increasing { background: var(--hl-crit-wash); color: var(--hl-crit); }
   .dir-steady { background: var(--hl-sunken); color: var(--hl-fg-muted); }
   .dir-decreasing, .dir-resolved { background: var(--hl-ok-wash); color: var(--hl-ok); }
@@ -131,32 +114,38 @@
 </style>
 </head>
 <body>
-<header>
-  <div class="hbar">
-    <h1>🛰️ Syslog AI Monitor</h1>
+<div class="shell">
+  <!-- Row one is the shared contract: name, status, nav, running commit.
+       Identical on every appliance (homelab-standards style-guide.md). -->
+  <header class="hl-header">
+    <h1 class="hl-header-name">Syslog AI Monitor</h1>
     <span id="headStatus"></span>
-    <div class="spacer"></div>
-    <span class="meta" id="buffered"></span>
-    <button class="refresh" onclick="load()">Refresh</button>
-  </div>
+    <span class="hl-header-spacer"></span>
+    <nav class="hl-header-nav">
+      <a class="hl-header-link" href="/api/health" target="_blank" rel="noopener">Health</a>
+      <a class="hl-header-link" href="/docs" target="_blank" rel="noopener">API&nbsp;docs</a>
+      <a class="hl-header-link" href="/api/history?limit=200" target="_blank" rel="noopener">History&nbsp;JSON</a>
+      <a class="hl-header-link" href="/api/weekly" target="_blank" rel="noopener">Weekly&nbsp;JSON</a>
+      <a class="hl-header-link" href="/api/status" target="_blank" rel="noopener">Status&nbsp;JSON</a>
+    </nav>
+    <span class="hl-header-meta" id="build"></span>
+  </header>
+  <!-- Row two is this appliance's own: its primary action and live counters. -->
   <div class="hbar links">
-    <button class="runbtn" onclick="runNow(this)">▶ Run evaluation now</button>
+    <button class="hl-btn hl-btn--primary" onclick="runNow(this)">▶ Run evaluation now</button>
     <span class="runmsg" id="runmsg"></span>
     <div class="spacer"></div>
-    <a href="/api/health" target="_blank" rel="noopener">Health</a>
-    <a href="/docs" target="_blank" rel="noopener">API&nbsp;docs</a>
-    <a href="/api/history?limit=200" target="_blank" rel="noopener">History&nbsp;JSON</a>
-    <a href="/api/weekly" target="_blank" rel="noopener">Weekly&nbsp;JSON</a>
-    <a href="/api/status" target="_blank" rel="noopener">Status&nbsp;JSON</a>
+    <span class="meta hl-num" id="buffered"></span>
+    <button class="hl-btn refresh" onclick="load()">Refresh</button>
   </div>
-</header>
+</div>
 
 <main>
   <div id="latest"></div>
 
   <h3 class="weekly-head">
     Last 7 days — patterns
-    <button class="runbtn small" onclick="runWeekly(this)">▶ Run weekly review</button>
+    <button class="hl-btn hl-btn--primary hl-btn--sm" onclick="runWeekly(this)">▶ Run weekly review</button>
     <span class="runmsg" id="weeklymsg"></span>
   </h3>
   <div id="weekly"><div class="empty">Loading…</div></div>
@@ -203,9 +192,11 @@ function renderLatest(latest) {
                       : `<div class="empty">No issues found in the latest period. ✅</div>`}`;
 }
 
+// The shared pill takes --ok/--warn/--crit; this app speaks ok/warning/error.
+const PILL_MOD = { ok: "ok", warning: "warn", error: "crit" };
 function statusPill(status) {
   const s = (status || "ok").toLowerCase();
-  return `<span class="pill status-${esc(s)}">${esc(s)}</span>`;
+  return `<span class="hl-pill hl-pill--${PILL_MOD[s] || "info"}">${esc(s)}</span>`;
 }
 
 // Weekly period_status (ok|watch|action) reuses the hourly status colors.
@@ -245,7 +236,7 @@ function renderWeekly(w) {
   const watch = p.watchlist || [];
   el.innerHTML = `
     <div class="banner s-${esc(color)}">
-      <h2>${esc(w.window_days)}-day review <span class="pill status-${esc(color)}">${esc(s)}</span></h2>
+      <h2>${esc(w.window_days)}-day review <span class="hl-pill hl-pill--${PILL_MOD[color] || "info"}">${esc(s)}</span></h2>
       <div>${esc(p.overall_assessment)}</div>
       <div class="meta" style="margin-top:6px">${esc(w.finding_count)} hourly evaluations reviewed · ${fmt(w.period_start)} → ${fmt(w.period_end)} · reviewed ${fmt(w.ts)}</div>
     </div>
@@ -297,6 +288,18 @@ async function load() {
   }
 }
 
+// The running build, in the shell header where every appliance carries it.
+// This dashboard has never shown it: /api/version exists and nothing linked or
+// rendered it, so there was no way to tell from the UI whether a Watchtower
+// update had landed. Fetched once -- it cannot change without a restart.
+async function loadBuild() {
+  try {
+    const v = await (await fetch("/api/version")).json();
+    document.getElementById("build").textContent =
+      [v.commit, (v.built_at || "").slice(0, 10)].filter(Boolean).join(" · ") || "dev";
+  } catch (e) { /* header meta stays empty; not worth a visible error */ }
+}
+
 async function runNow(btn) {
   const msg = document.getElementById("runmsg");
   const orig = btn.textContent;
@@ -330,6 +333,7 @@ async function runWeekly(btn) {
 }
 
 load();
+loadBuild();               // once: the build can't change without a restart
 setInterval(load, 60000);  // auto-refresh each minute
 </script>
 </body>

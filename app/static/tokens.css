@@ -49,8 +49,16 @@
   --hl-crit:          #cf222e;
   --hl-crit-wash:     rgba(207, 34, 46, .07);
   --hl-crit-strong:   #a40e26;   /* critical, distinct from error */
-  --hl-info:          #0969da;   /* == accent: informational is not a problem */
-  --hl-info-wash:     rgba(9, 105, 218, .08);
+  /* Neutral slate, NOT the accent blue. A state that is neither good nor bad
+     gets a neutral colour, so every saturated hue on the surface means exactly
+     one thing: blue = you can act on this, green/amber/red = this needs your
+     attention. This token was #0969da — identical to --hl-accent — which put a
+     blue "Cooling" status pill next to a blue "Save" button and destroyed that
+     distinction. Purple was considered and rejected: it sits within 1.03:1
+     luminance of the accent, so the two are near-indistinguishable to exactly
+     the reader the redundant-dot rule exists to protect. */
+  --hl-info:          #4c5561;   /* 6.69:1 on its own wash, 7.10:1 on canvas */
+  --hl-info-wash:     rgba(76, 85, 97, .08);
 
   /* ── radii ─────────────────────────────────────────────────────────────── */
   --hl-radius-sm:     4px;       /* chips, inputs */
@@ -97,61 +105,17 @@
   --hl-focus-ring:   0 0 0 3px var(--hl-accent-wash);
 }
 
-/* ── primitives ────────────────────────────────────────────────────────────
-   Deliberately minimal. These are the shapes every appliance repeats; anything
-   app-specific stays in the app.                                             */
+/* This file is values only — no component classes.
+   The shapes those values are meant to build live in components.css, which is
+   the other half of the system. Import both.
 
-.hl-focusable:focus-visible,
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-select:focus-visible {
-  outline: 2px solid var(--hl-accent);
-  outline-offset: 2px;
-}
+   They used to be one file, and the component half went unused: all three
+   appliances hand-rolled their own pill, label and table while importing the
+   shared ones. Splitting them makes "did you adopt the components?" a question
+   with a visible answer.
 
-/* Numbers that stack in columns must not jitter as they update. */
-.hl-num,
-.hl-tile-value,
-td.hl-num {
-  font-family: var(--hl-font-mono);
-  font-variant-numeric: tabular-nums;
-}
-
-.hl-label {
-  font-size: var(--hl-text-xs);
-  font-weight: var(--hl-weight-semibold);
-  letter-spacing: var(--hl-tracking-label);
-  color: var(--hl-fg-muted);
-}
-
-.hl-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--hl-space-2);
-  padding: 6px 11px;
-  border-radius: var(--hl-radius-pill);
-  border: 1px solid currentColor;
-  font-size: 12px;
-  font-weight: var(--hl-weight-semibold);
-  line-height: 1;
-}
-/* The dot carries state redundantly with colour, for anyone who can't
-   distinguish the hues. */
-.hl-pill::before {
-  content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: var(--hl-radius-pill);
-  background: currentColor;
-}
-.hl-pill--ok   { color: var(--hl-ok);   background: var(--hl-ok-wash); }
-.hl-pill--warn { color: var(--hl-warn); background: var(--hl-warn-wash); }
-.hl-pill--crit { color: var(--hl-crit); background: var(--hl-crit-wash); }
-.hl-pill--info { color: var(--hl-info); background: var(--hl-info-wash); }
-
-/* NOTE: no global prefers-reduced-motion reset here, deliberately.
+   NOTE: no global prefers-reduced-motion reset here, deliberately.
    A `* { animation-duration: 0 !important }` rule is not a token — it is a
    global side effect, and this file gets bundled app-wide. In split-flap that
    would disable the split-flap animation itself, which is the product.
-   Each app honours the preference on its own admin surfaces instead. */
+   components.css scopes the preference to .hl-* instead. */
