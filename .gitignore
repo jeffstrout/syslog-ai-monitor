@@ -20,3 +20,4 @@ venv/
 
 # iCloud placeholder cruft
 .icloud
+.venv/

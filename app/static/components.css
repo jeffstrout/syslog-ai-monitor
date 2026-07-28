@@ -1,0 +1,348 @@
+/* ============================================================================
+   Homelab appliance components — v1
+   The shapes every management surface repeats, built from tokens.css.
+
+   WHY THIS FILE EXISTS
+   style-guide.md described these six components in prose, and prose does not
+   make three apps look alike any more than a written palette does. Each
+   appliance independently invented its own status pill, its own table, its own
+   card padding — all correctly using the shared tokens, and all looking like
+   different applications. Identical colours, different vocabulary.
+
+   That matters for Phase 4 of the fleet plan, where the manager composes these
+   UIs behind a reverse proxy so the user never perceives a boundary. Shared
+   values get you most of the way; shared shapes close the gap.
+
+   USAGE
+     <link rel="stylesheet" href="/static/tokens.css">
+     <link rel="stylesheet" href="/static/components.css">   <!-- after tokens -->
+
+   Vendor both into each appliance rather than fetching them — the LAN has no
+   guarantee of anything, including itself. Then delete the hand-rolled
+   equivalents. That deletion is the adoption.
+
+   THE RULE THAT CARRIES THE SYSTEM
+   Accent and semantic colour are separate systems and never trade places.
+   Blue means "you can act on this" (buttons, links, focus). Green/amber/red
+   mean "this is the state of something". --hl-info is a neutral slate, not a
+   second blue, so a status pill can never be mistaken for a button.
+
+   Scope: admin/control surfaces only. The split-flap *display* is exempt.
+   ============================================================================ */
+
+/* ── focus ─────────────────────────────────────────────────────────────────
+   Never remove an outline without replacing it. This applies to bare elements
+   too, so an app gets a visible focus ring without opting in.                */
+.hl-focusable:focus-visible,
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--hl-accent);
+  outline-offset: 2px;
+}
+
+/* ── text primitives ───────────────────────────────────────────────────── */
+
+/* Numbers that update in place or stack in a column must not jitter as their
+   values change. Mono + tabular figures is the whole fix. */
+.hl-num,
+.hl-tile-value,
+td.hl-num {
+  font-family: var(--hl-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.hl-label {
+  font-size: var(--hl-text-xs);
+  font-weight: var(--hl-weight-semibold);
+  letter-spacing: var(--hl-tracking-label);
+  color: var(--hl-fg-muted);
+  text-transform: uppercase;
+}
+
+/* Units ride at ~0.6em in muted grey so the value stays the thing you read:
+   18.3°F, not "18.3 °F" in one weight. */
+.hl-unit {
+  font-size: .6em;
+  font-weight: var(--hl-weight-normal);
+  color: var(--hl-fg-muted);
+  margin-left: 1px;
+}
+
+/* ── shell header ──────────────────────────────────────────────────────────
+   The one component that makes composed UIs feel like one application. Row one
+   is identical on every appliance, in this order:
+
+     [name] [status pill] ······ [Health] [API docs] [app links…] [commit]
+
+   Health and API docs are REQUIRED everywhere. They are the two things you
+   reach for when an appliance misbehaves, and having to remember which
+   appliance exposes them is the whole problem this contract solves.
+
+   An app-specific second row (a primary action, live counters) is fine. Row one
+   is not negotiable.
+
+   Sticky, because losing the status pill while you scroll a fault list is
+   exactly wrong for a monitoring surface.                                     */
+.hl-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--hl-space-2) var(--hl-space-3);
+  flex-wrap: wrap;
+  padding: var(--hl-space-3) var(--hl-space-4);
+  background: var(--hl-surface);
+  border-bottom: 1px solid var(--hl-border);
+}
+.hl-header-name {
+  font-size: var(--hl-text-md);
+  font-weight: var(--hl-weight-semibold);
+  color: var(--hl-fg);
+  margin: 0;
+}
+/* Pushes everything after it to the right edge. */
+.hl-header-spacer { margin-left: auto; }
+
+/* Nav sits between the spacer and the commit. Accent-coloured because a link
+   IS an action — this is the one place in a header where blue is correct. */
+.hl-header-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hl-space-3);
+}
+.hl-header-link {
+  color: var(--hl-accent);
+  text-decoration: none;
+  font-size: var(--hl-text-sm);
+  font-weight: var(--hl-weight-medium);
+  white-space: nowrap;
+}
+.hl-header-link:hover { text-decoration: underline; }
+
+.hl-header-meta {
+  font-family: var(--hl-font-mono);
+  font-size: var(--hl-text-xs);
+  color: var(--hl-fg-muted);
+  white-space: nowrap;
+}
+
+/* Narrow screens: the spacer stops pushing, so the nav wraps onto its own line
+   underneath the name instead of shoving the commit off the edge. Without this
+   the running build — the thing you check when a rollout looks wrong — is the
+   first casualty on a phone. */
+@media (max-width: 560px) {
+  .hl-header { gap: var(--hl-space-2); }
+  .hl-header-spacer { margin-left: 0; flex-basis: 100%; height: 0; }
+  .hl-header-nav { gap: var(--hl-space-3); }
+}
+
+/* ── card ──────────────────────────────────────────────────────────────────
+   Cards sit ON the page, they do not float above it, so they get a border and
+   no shadow. Depth comes from the canvas→surface step.                       */
+.hl-card {
+  background: var(--hl-surface);
+  border: 1px solid var(--hl-border);
+  border-radius: var(--hl-radius);
+  padding: var(--hl-space-4);
+}
+/* A card whose left edge carries its status. Pair with --ok/--warn/--crit. */
+.hl-card--accented { border-left-width: 3px; }
+.hl-card--ok   { border-left-color: var(--hl-ok); }
+.hl-card--warn { border-left-color: var(--hl-warn); }
+.hl-card--crit { border-left-color: var(--hl-crit); }
+.hl-card--info { border-left-color: var(--hl-info); }
+
+/* ── status pill ───────────────────────────────────────────────────────────
+   The headline state. One per surface, near the top.                         */
+.hl-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hl-space-2);
+  padding: 6px 11px;
+  border-radius: var(--hl-radius-pill);
+  border: 1px solid currentColor;
+  font-size: 12px;
+  font-weight: var(--hl-weight-semibold);
+  line-height: 1;
+  white-space: nowrap;
+}
+/* The dot carries state redundantly with colour. Roughly one man in twelve
+   cannot reliably separate the red from the green, and this is a fault
+   display — hue alone is never allowed to be the only signal. */
+.hl-pill::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: var(--hl-radius-pill);
+  background: currentColor;
+  flex: none;
+}
+.hl-pill--ok   { color: var(--hl-ok);   background: var(--hl-ok-wash); }
+.hl-pill--warn { color: var(--hl-warn); background: var(--hl-warn-wash); }
+.hl-pill--crit { color: var(--hl-crit); background: var(--hl-crit-wash); }
+.hl-pill--info { color: var(--hl-info); background: var(--hl-info-wash); }
+
+/* ── stat tile ─────────────────────────────────────────────────────────────
+   A labelled number. Four across on desktop, two on narrow.                  */
+.hl-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--hl-space-3);
+}
+.hl-tile {
+  background: var(--hl-surface);
+  border: 1px solid var(--hl-border);
+  border-radius: var(--hl-radius);
+  padding: var(--hl-space-3) var(--hl-space-4);
+}
+.hl-tile-value {
+  display: block;
+  margin-top: var(--hl-space-1);
+  font-size: var(--hl-text-metric);
+  font-weight: var(--hl-weight-semibold);
+  line-height: var(--hl-leading-tight);
+  color: var(--hl-fg);
+}
+.hl-tile-value--ok   { color: var(--hl-ok); }
+.hl-tile-value--warn { color: var(--hl-warn); }
+.hl-tile-value--crit { color: var(--hl-crit); }
+
+/* ── fault row ─────────────────────────────────────────────────────────────
+   A binary condition. Inactive rows keep the neutral border, so an active one
+   is visible without reading it — which is the point of a fault list.        */
+.hl-fault {
+  display: flex;
+  align-items: center;
+  gap: var(--hl-space-3);
+  padding: var(--hl-space-2) var(--hl-space-3);
+  background: var(--hl-surface);
+  border: 1px solid var(--hl-border);
+  border-left: 3px solid var(--hl-border);
+  border-radius: var(--hl-radius-sm);
+}
+.hl-fault + .hl-fault { margin-top: var(--hl-space-2); }
+.hl-fault-name { color: var(--hl-fg); }
+/* State word, right-aligned and mono so the column reads straight down. */
+.hl-fault-state {
+  margin-left: auto;
+  font-family: var(--hl-font-mono);
+  font-size: var(--hl-text-sm);
+  font-weight: var(--hl-weight-semibold);
+  color: var(--hl-fg-muted);
+}
+.hl-fault--active {
+  border-left-color: var(--hl-crit);
+  background: var(--hl-crit-wash);
+}
+.hl-fault--active .hl-fault-state { color: var(--hl-crit); }
+.hl-fault--warn {
+  border-left-color: var(--hl-warn);
+  background: var(--hl-warn-wash);
+}
+.hl-fault--warn .hl-fault-state { color: var(--hl-warn); }
+
+/* ── data table ────────────────────────────────────────────────────────────
+   Wide content scrolls inside its own container; the page body never scrolls
+   sideways. Wrap the table in .hl-table-wrap.                                */
+.hl-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--hl-border);
+  border-radius: var(--hl-radius);
+  background: var(--hl-surface);
+}
+.hl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--hl-text-sm);
+}
+.hl-table th {
+  text-align: left;
+  padding: var(--hl-space-2) var(--hl-space-3);
+  background: var(--hl-canvas);
+  border-bottom: 1px solid var(--hl-border);
+  font-size: var(--hl-text-xs);
+  font-weight: var(--hl-weight-semibold);
+  letter-spacing: var(--hl-tracking-label);
+  text-transform: uppercase;
+  color: var(--hl-fg-muted);
+  white-space: nowrap;
+}
+.hl-table td {
+  padding: var(--hl-space-3);
+  border-bottom: 1px solid var(--hl-border);
+  color: var(--hl-fg);
+}
+.hl-table tr:last-child td { border-bottom: 0; }
+/* Numeric columns right-align and go mono, so digits line up by place value. */
+.hl-table td.hl-num,
+.hl-table th.hl-num { text-align: right; }
+.hl-table tbody tr:hover td { background: var(--hl-sunken); }
+
+/* ── buttons ───────────────────────────────────────────────────────────────
+   Accent fill for the primary action, accent-on-transparent for secondary.
+   One primary per view. Accent here is legitimate: a button IS an action.    */
+.hl-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hl-space-2);
+  padding: 7px var(--hl-space-3);
+  border-radius: var(--hl-radius);
+  border: 1px solid var(--hl-border);
+  background: var(--hl-surface);
+  color: var(--hl-accent);
+  font-family: inherit;
+  font-size: var(--hl-text-sm);
+  font-weight: var(--hl-weight-medium);
+  line-height: 1.4;
+  cursor: pointer;
+}
+.hl-btn:hover { background: var(--hl-sunken); }
+.hl-btn--primary {
+  background: var(--hl-accent);
+  border-color: var(--hl-accent);
+  color: var(--hl-fg-on-accent);
+}
+.hl-btn--primary:hover {
+  background: var(--hl-accent-hover);
+  border-color: var(--hl-accent-hover);
+}
+.hl-btn[disabled] {
+  color: var(--hl-fg-subtle);
+  cursor: not-allowed;
+  opacity: .7;
+}
+
+/* ── inputs ────────────────────────────────────────────────────────────── */
+.hl-input {
+  padding: 6px var(--hl-space-2);
+  border: 1px solid var(--hl-border);
+  border-radius: var(--hl-radius-sm);
+  background: var(--hl-surface);
+  color: var(--hl-fg);
+  font-family: inherit;
+  font-size: var(--hl-text-sm);
+}
+.hl-input:focus {
+  border-color: var(--hl-accent);
+  box-shadow: var(--hl-focus-ring);
+  outline: none;
+}
+.hl-input::placeholder { color: var(--hl-fg-subtle); }
+
+/* ── motion ────────────────────────────────────────────────────────────────
+   Scoped to .hl-* rather than `*`. A blanket reset would reach the split-flap
+   board's animation, which is the product, not decoration — this file gets
+   bundled app-wide there just like tokens.css does.                          */
+@media (prefers-reduced-motion: reduce) {
+  [class*="hl-"],
+  [class*="hl-"]::before,
+  [class*="hl-"]::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}
