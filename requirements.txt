@@ -5,3 +5,4 @@ anthropic==0.69.0
 python-dotenv==1.0.1
 tzdata==2025.2
 
+paho-mqtt==2.1.0

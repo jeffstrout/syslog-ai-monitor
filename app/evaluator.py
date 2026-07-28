@@ -11,7 +11,7 @@ from collections import Counter
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from . import alerts, claude_client, db
+from . import alerts, claude_client, db, mqtt_out
 from .config import settings
 from .preprocess import build_digest
 
@@ -66,6 +66,15 @@ def breaker_state() -> dict:
         "retry_in_seconds": round(remaining) if is_open else None,
         "consecutive_permanent_failures": _breaker_consecutive,
     }
+
+
+def publish_mqtt() -> None:
+    """Push current state to MQTT. Also the scheduled heartbeat job.
+
+    Lives here rather than in mqtt_out so that module stays free of `evaluator`
+    (which imports it) — the breaker state is passed in instead.
+    """
+    mqtt_out.publisher.publish(breaker_state())
 
 
 def _is_permanent_api_error(exc: Exception) -> bool:
@@ -155,6 +164,7 @@ def run_evaluation(force: bool = False) -> dict | None:
         alerts.maybe_send_failure(exc, permanent=permanent,
                                   buffered=db.raw_log_count())
         _enforce_raw_log_bound()
+        publish_mqtt()   # surface the breaker/staleness in HA immediately
         return None  # leave raw logs in place so the data isn't lost
 
     # The call worked, so whatever was wrong has cleared — recovery is automatic.
@@ -173,6 +183,7 @@ def run_evaluation(force: bool = False) -> dict | None:
     _enforce_raw_log_bound()
 
     alerts.maybe_send(result)
+    publish_mqtt()
     return result
 
 

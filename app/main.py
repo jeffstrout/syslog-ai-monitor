@@ -15,9 +15,11 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
-from . import db, syslog_listener
+from . import db, mqtt_out, syslog_listener
 from .config import settings
-from .evaluator import purge_old_findings, run_evaluation, run_weekly_review
+from .evaluator import (
+    publish_mqtt, purge_old_findings, run_evaluation, run_weekly_review,
+)
 from .web import app
 
 logging.basicConfig(
@@ -85,6 +87,14 @@ async def main() -> None:
         purge_old_findings,
         CronTrigger(hour=3, minute=30), id="retention_purge",
     )
+    # MQTT heartbeat. Also what keeps Home Assistant's view fresh between hourly
+    # evaluations — breaker and staleness can change without an evaluation.
+    if settings.mqtt_enabled:
+        scheduler.add_job(
+            publish_mqtt,
+            IntervalTrigger(minutes=settings.mqtt_publish_interval_minutes),
+            id="mqtt_publish", max_instances=1, coalesce=True,
+        )
     scheduler.start()
 
     job = scheduler.get_job("hourly_eval")
@@ -95,6 +105,14 @@ async def main() -> None:
     log.info("weekly pattern review: %d-day window, daily at %02d:00 (next run %s)",
              settings.weekly_window_days, settings.weekly_review_hour,
              wk.next_run_time)
+    if settings.mqtt_enabled:
+        log.info("MQTT: publishing to %s:%d under '%s' every %d min "
+                 "(availability via LWT on %s)",
+                 settings.mqtt_host, settings.mqtt_port, settings.mqtt_base_topic,
+                 settings.mqtt_publish_interval_minutes,
+                 mqtt_out.availability_topic())
+    else:
+        log.info("MQTT: disabled (set MQTT_HOST to enable)")
 
     # Web server (Uvicorn) as an asyncio task on this same loop.
     config = uvicorn.Config(
@@ -115,3 +133,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         log.info("shutting down")
+    finally:
+        # Publish `offline` on a clean stop. The LWT covers the unclean case —
+        # this stops HA showing the device as available after a deliberate stop.
+        mqtt_out.publisher.close()

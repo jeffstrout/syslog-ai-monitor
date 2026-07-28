@@ -70,6 +70,17 @@ class Settings:
     alert_to: str = os.getenv("ALERT_TO", "").strip()
     alert_min_severity: str = os.getenv("ALERT_MIN_SEVERITY", "error").strip().lower()
 
+    # MQTT / Home Assistant. Disabled unless MQTT_HOST is set, mirroring the SMTP
+    # handling. Topic scheme matches ac-monitor (homelab-standards docs/mqtt.md);
+    # HA entities are bound to that shape, so it must not drift.
+    mqtt_host: str = os.getenv("MQTT_HOST", "").strip()
+    mqtt_port: int = _int("MQTT_PORT", 1883)
+    mqtt_user: str = os.getenv("MQTT_USER", "").strip()
+    mqtt_pass: str = os.getenv("MQTT_PASS", "")
+    mqtt_base_topic: str = os.getenv("MQTT_BASE_TOPIC", "syslog_monitor").strip()
+    mqtt_discovery_prefix: str = os.getenv("MQTT_DISCOVERY_PREFIX", "homeassistant").strip()
+    mqtt_publish_interval_minutes: int = _int("MQTT_PUBLISH_INTERVAL_MINUTES", 1)
+
     # Storage
     db_path: str = os.getenv("DB_PATH", "/data/syslog.db").strip()
 
@@ -80,6 +91,10 @@ class Settings:
     @property
     def email_enabled(self) -> bool:
         return bool(self.smtp_host and self.alert_to)
+
+    @property
+    def mqtt_enabled(self) -> bool:
+        return bool(self.mqtt_host)
 
 
 settings = Settings()
