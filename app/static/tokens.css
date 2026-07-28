@@ -1,0 +1,157 @@
+/* ============================================================================
+   Homelab appliance design tokens — v1
+   Single source of truth for the look of every management surface.
+
+   Direction: "Primer" (option A, chosen 2026-07-27). Derived from the palette
+   already live on syslog-ai-monitor's dashboard rather than invented, so one of
+   the three surfaces needed no visual migration.
+
+   LIGHT ONLY, deliberately. Control surfaces are read in a lit room, often at a
+   glance, and one palette means one set of contrast decisions to verify. The
+   split-flap *display* is exempt from this file entirely (see style-guide.md).
+
+   Import before your own stylesheet, then style through the variables. Never
+   hard-code a hex that exists here — that is how three apps drift apart.
+
+   Namespaced --hl-* so it cannot collide with an app's own custom properties
+   (split-flap already defines --board-rows / --board-cols).
+   ============================================================================ */
+
+:root {
+  /* ── surfaces ──────────────────────────────────────────────────────────────
+     Three levels, not two. A card-based control surface needs its cards to read
+     as *raised*, so the page ground is the grey and the cards are white — the
+     pattern syslog's dashboard already uses. Getting this backwards inverts the
+     whole look while every individual value stays "correct".                  */
+  --hl-canvas:        #f6f8fa;   /* page ground — recessed */
+  --hl-surface:       #ffffff;   /* raised: cards, banners, tiles, rows */
+  --hl-sunken:        #eef1f4;   /* inset: code blocks, evidence, hover */
+  --hl-border:        #d0d7de;   /* all hairlines */
+  --hl-border-strong: #afb8c1;   /* emphasis, focused input */
+
+  /* ── text ──────────────────────────────────────────────────────────────── */
+  --hl-fg:            #1f2328;   /* body + numbers */
+  --hl-fg-muted:      #59636e;   /* labels, secondary, units */
+  --hl-fg-subtle:     #818b98;   /* placeholder, disabled */
+  --hl-fg-on-accent:  #ffffff;
+
+  /* ── accent — interaction only, never status ───────────────────────────── */
+  --hl-accent:        #0969da;
+  --hl-accent-hover:  #0757ba;
+  --hl-accent-wash:   rgba(9, 105, 218, .08);
+  --hl-accent-line:   rgba(9, 105, 218, .40);
+
+  /* ── semantic — status only, never decoration ──────────────────────────── */
+  --hl-ok:            #1a7f37;
+  --hl-ok-wash:       rgba(26, 127, 55, .08);
+  --hl-warn:          #9a6700;
+  --hl-warn-wash:     rgba(154, 103, 0, .08);
+  --hl-crit:          #cf222e;
+  --hl-crit-wash:     rgba(207, 34, 46, .07);
+  --hl-crit-strong:   #a40e26;   /* critical, distinct from error */
+  --hl-info:          #0969da;   /* == accent: informational is not a problem */
+  --hl-info-wash:     rgba(9, 105, 218, .08);
+
+  /* ── radii ─────────────────────────────────────────────────────────────── */
+  --hl-radius-sm:     4px;       /* chips, inputs */
+  --hl-radius:        6px;       /* default: cards, buttons, tiles */
+  --hl-radius-lg:     10px;      /* modals, outer containers */
+  --hl-radius-pill:   999px;     /* status pills, switches */
+
+  /* ── spacing (4px base) ────────────────────────────────────────────────── */
+  --hl-space-1:       4px;
+  --hl-space-2:       8px;
+  --hl-space-3:       12px;
+  --hl-space-4:       16px;
+  --hl-space-5:       24px;
+  --hl-space-6:       32px;
+
+  /* ── type ──────────────────────────────────────────────────────────────────
+     System stacks only. Everything here runs LAN-only with no guaranteed
+     internet, and syslog's dashboard has no build step — a webfont is a
+     dependency that fails silently during an outage, which is exactly when a
+     monitoring surface must still be readable.                                */
+  --hl-font-sans:  system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+                   Arial, sans-serif;
+  --hl-font-mono:  ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+                   "Liberation Mono", monospace;
+
+  --hl-text-xs:       11px;      /* eyebrow labels */
+  --hl-text-sm:       13px;      /* secondary, table body */
+  --hl-text-base:     14px;      /* body */
+  --hl-text-md:       16px;      /* section headings */
+  --hl-text-lg:       20px;      /* page heading */
+  --hl-text-metric:   24px;      /* stat tile values */
+
+  --hl-weight-normal:   400;
+  --hl-weight-medium:   500;
+  --hl-weight-semibold: 600;
+
+  --hl-leading-tight: 1.25;
+  --hl-leading:       1.5;
+  --hl-tracking-label: .02em;
+
+  /* ── elevation + focus ─────────────────────────────────────────────────── */
+  --hl-shadow:       0 1px 2px rgba(31, 35, 40, .07);
+  --hl-shadow-lg:    0 8px 24px -12px rgba(31, 35, 40, .28);
+  --hl-focus-ring:   0 0 0 3px var(--hl-accent-wash);
+}
+
+/* ── primitives ────────────────────────────────────────────────────────────
+   Deliberately minimal. These are the shapes every appliance repeats; anything
+   app-specific stays in the app.                                             */
+
+.hl-focusable:focus-visible,
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--hl-accent);
+  outline-offset: 2px;
+}
+
+/* Numbers that stack in columns must not jitter as they update. */
+.hl-num,
+.hl-tile-value,
+td.hl-num {
+  font-family: var(--hl-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.hl-label {
+  font-size: var(--hl-text-xs);
+  font-weight: var(--hl-weight-semibold);
+  letter-spacing: var(--hl-tracking-label);
+  color: var(--hl-fg-muted);
+}
+
+.hl-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hl-space-2);
+  padding: 6px 11px;
+  border-radius: var(--hl-radius-pill);
+  border: 1px solid currentColor;
+  font-size: 12px;
+  font-weight: var(--hl-weight-semibold);
+  line-height: 1;
+}
+/* The dot carries state redundantly with colour, for anyone who can't
+   distinguish the hues. */
+.hl-pill::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: var(--hl-radius-pill);
+  background: currentColor;
+}
+.hl-pill--ok   { color: var(--hl-ok);   background: var(--hl-ok-wash); }
+.hl-pill--warn { color: var(--hl-warn); background: var(--hl-warn-wash); }
+.hl-pill--crit { color: var(--hl-crit); background: var(--hl-crit-wash); }
+.hl-pill--info { color: var(--hl-info); background: var(--hl-info-wash); }
+
+/* NOTE: no global prefers-reduced-motion reset here, deliberately.
+   A `* { animation-duration: 0 !important }` rule is not a token — it is a
+   global side effect, and this file gets bundled app-wide. In split-flap that
+   would disable the split-flap animation itself, which is the product.
+   Each app honours the preference on its own admin surfaces instead. */
