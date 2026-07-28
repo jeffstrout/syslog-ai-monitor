@@ -150,6 +150,8 @@ td.hl-num {
 .hl-pill--crit { color: var(--hl-crit); background: var(--hl-crit-wash); }
 .hl-pill--info { color: var(--hl-info); background: var(--hl-info-wash); }
 
-@media (prefers-reduced-motion: reduce) {
-  * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
-}
+/* NOTE: no global prefers-reduced-motion reset here, deliberately.
+   A `* { animation-duration: 0 !important }` rule is not a token — it is a
+   global side effect, and this file gets bundled app-wide. In split-flap that
+   would disable the split-flap animation itself, which is the product.
+   Each app honours the preference on its own admin surfaces instead. */
