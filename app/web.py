@@ -11,10 +11,10 @@ import os
 import time
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import db, evaluator
+from . import api_docs, db, evaluator
 from .config import settings
 from .version import get_version
 
@@ -251,6 +251,21 @@ def run_weekly() -> dict:
 @app.get("/", tags=["ui"], summary="Dashboard", include_in_schema=False)
 def index() -> FileResponse:
     return FileResponse(os.path.join(_STATIC_DIR, "index.html"))
+
+
+@app.get("/api/docs", tags=["ui"], summary="API reference", include_in_schema=False)
+def api_reference() -> HTMLResponse:
+    """The fleet's shared API reference page.
+
+    This is what the shell header's `API docs` link points at on every
+    appliance. FastAPI's `/docs` stays mounted for interactive use, but it
+    fetches swagger-ui from a CDN and so renders an empty shell on a LAN with
+    no route out — which is when you reach for it
+    (jeffstrout/homelab-standards#7). This page has no external dependency.
+
+    Rendered from `app.openapi()`, so it cannot drift from the routes above.
+    """
+    return HTMLResponse(api_docs.render(app, version=get_version()))
 
 
 # Serve any other static assets if added later.

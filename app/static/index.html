@@ -117,7 +117,9 @@
     <span class="hl-header-spacer"></span>
     <nav class="hl-header-nav">
       <a class="hl-header-link" href="/api/health" target="_blank" rel="noopener">Health</a>
-      <a class="hl-header-link" href="/docs" target="_blank" rel="noopener">API&nbsp;docs</a>
+      <!-- /api/docs, not FastAPI's /docs: the shared reference page renders
+           offline, where swagger-ui's CDN assets do not (homelab-standards#7). -->
+      <a class="hl-header-link" href="/api/docs" target="_blank" rel="noopener">API&nbsp;docs</a>
       <a class="hl-header-link" href="/api/history?limit=200" target="_blank" rel="noopener">History&nbsp;JSON</a>
       <a class="hl-header-link" href="/api/weekly" target="_blank" rel="noopener">Weekly&nbsp;JSON</a>
       <a class="hl-header-link" href="/api/status" target="_blank" rel="noopener">Status&nbsp;JSON</a>
