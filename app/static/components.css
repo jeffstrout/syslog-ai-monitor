@@ -70,15 +70,60 @@ td.hl-num {
   margin-left: 1px;
 }
 
+/* "No findings yet", "No history yet" — the placeholder where data will be. */
+.hl-empty {
+  color: var(--hl-fg-muted);
+  padding: var(--hl-space-5) 0;
+}
+
+/* A muted explanatory paragraph: the sentence above a control that says what
+   the control does. All three appliances had one; none of them agreed on its
+   size or leading. */
+.hl-note {
+  margin: 0 0 var(--hl-space-4);
+  color: var(--hl-fg-muted);
+  font-size: var(--hl-text-sm);
+  line-height: 1.55;
+}
+
+/* Inline code — an endpoint or a path inside a note. `overflow-wrap: anywhere`
+   because these are unbreakable tokens (`POST /api/screens/<slot>`) and a
+   non-wrapping one sets a minimum width for whatever contains it, which on a
+   phone is the whole card. */
+.hl-code {
+  font-family: var(--hl-font-mono);
+  font-size: .92em;
+  background: var(--hl-sunken);
+  padding: 1px 5px;
+  border-radius: var(--hl-radius-sm);
+  overflow-wrap: anywhere;
+}
+
+/* Anything too wide to fit scrolls inside its own box. The page body never
+   scrolls sideways — .hl-table-wrap does this for tables; this is the same
+   contract for everything else (log evidence, preformatted output). */
+.hl-scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* ── shell header ──────────────────────────────────────────────────────────
    The one component that makes composed UIs feel like one application. Row one
    is identical on every appliance, in this order:
 
-     [name] [status pill] ······ [Health] [API docs] [app links…] [commit]
+     [name] [status pill] ············ [Health] [API docs] [app links…]
 
    Health and API docs are REQUIRED everywhere. They are the two things you
    reach for when an appliance misbehaves, and having to remember which
    appliance exposes them is the whole problem this contract solves.
+
+   The running commit used to sit right-most here and now lives in .hl-footer.
+   The header is the row you SCAN — name, headline state, and the two links you
+   reach for when something is broken. Provenance is none of those: you go
+   looking for it deliberately, once, when you are asking whether a Watchtower
+   update landed. It was paying for prime header space on every appliance to
+   answer a question nobody asks at a glance, and on a 375px row it was the
+   element competing hardest with the status pill.
 
    An app-specific second row (a primary action, live counters) is fine. Row one
    is not negotiable.
@@ -123,21 +168,52 @@ td.hl-num {
 }
 .hl-header-link:hover { text-decoration: underline; }
 
-.hl-header-meta {
-  font-family: var(--hl-font-mono);
-  font-size: var(--hl-text-xs);
-  color: var(--hl-fg-muted);
-  white-space: nowrap;
-}
-
 /* Narrow screens: the spacer stops pushing, so the nav wraps onto its own line
-   underneath the name instead of shoving the commit off the edge. Without this
-   the running build — the thing you check when a rollout looks wrong — is the
-   first casualty on a phone. */
+   underneath the name rather than being squeezed against the edge. */
 @media (max-width: 560px) {
   .hl-header { gap: var(--hl-space-2); }
   .hl-header-spacer { margin-left: 0; flex-basis: 100%; height: 0; }
   .hl-header-nav { gap: var(--hl-space-3); }
+}
+
+/* ── page ──────────────────────────────────────────────────────────────────
+   The content column. This is the piece the sheet was missing: it shipped the
+   *contents* of a page — pill, tile, table, button — and never the page, so
+   each appliance invented its own container, its own gutters and its own
+   vertical rhythm around them. Three token-compliant bodies that read as three
+   applications, which is the same failure this file was created to fix, one
+   level up.
+
+   Side gutters use max(space, safe-area-inset) so a notched phone in landscape
+   doesn't tuck content under the cutout. ac-monitor worked that out first; it
+   belongs to everyone.                                                       */
+.hl-page {
+  max-width: var(--hl-page-max);
+  margin: 0 auto;
+  padding: var(--hl-space-5) max(var(--hl-space-4), env(safe-area-inset-right))
+           var(--hl-space-6) max(var(--hl-space-4), env(safe-area-inset-left));
+}
+
+/* ── section ───────────────────────────────────────────────────────────────
+   One vertical rhythm and one eyebrow. The three appliances ran .02em, .05em
+   and .12em tracking on the same uppercase heading at three sizes — the single
+   most visible body difference between them.
+
+   The title is a flex row so a section can carry a trailing action or a live
+   message ("Run weekly review") without inventing a second heading class.    */
+.hl-section { margin-top: var(--hl-space-6); }
+.hl-section:first-child { margin-top: 0; }
+.hl-section-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--hl-space-2) var(--hl-space-3);
+  margin: 0 0 var(--hl-space-3);
+  font-size: var(--hl-text-xs);
+  font-weight: var(--hl-weight-semibold);
+  letter-spacing: var(--hl-tracking-label);
+  text-transform: uppercase;
+  color: var(--hl-fg-muted);
 }
 
 /* ── card ──────────────────────────────────────────────────────────────────
@@ -155,6 +231,59 @@ td.hl-num {
 .hl-card--warn { border-left-color: var(--hl-warn); }
 .hl-card--crit { border-left-color: var(--hl-crit); }
 .hl-card--info { border-left-color: var(--hl-info); }
+
+/* ── banner ────────────────────────────────────────────────────────────────
+   The headline block at the top of a surface: the thing you read before you
+   read anything else. syslog called it .banner and ac-monitor called it .hero;
+   they are the same shape doing the same job, so they are one component now.
+
+   The left border is 3px, matching .hl-card--accented. syslog's was 4px, which
+   is the kind of difference nobody notices individually and everybody notices
+   side by side.                                                              */
+.hl-banner {
+  background: var(--hl-surface);
+  border: 1px solid var(--hl-border);
+  border-left: 3px solid var(--hl-border);
+  border-radius: var(--hl-radius);
+  padding: var(--hl-space-4);
+}
+.hl-banner--ok   { border-left-color: var(--hl-ok); }
+.hl-banner--warn { border-left-color: var(--hl-warn); }
+.hl-banner--crit { border-left-color: var(--hl-crit); }
+.hl-banner--info { border-left-color: var(--hl-info); }
+
+/* A banner whose content sits on one baseline-aligned row — a big number and
+   its label and state, rather than a heading over prose. */
+.hl-banner--row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--hl-space-2) var(--hl-space-4);
+}
+.hl-banner-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--hl-space-2);
+  margin: 0 0 var(--hl-space-1);
+  font-size: var(--hl-text-md);
+  font-weight: var(--hl-weight-semibold);
+}
+/* A number at display size. Fluid rather than fixed: this is the one value on
+   the surface that should still be readable from arm's length on a phone. */
+.hl-banner-metric {
+  font-family: var(--hl-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(2rem, 11vw, 2.6rem);
+  font-weight: var(--hl-weight-semibold);
+  line-height: 1;
+  letter-spacing: -.02em;
+}
+.hl-banner-meta {
+  margin-top: var(--hl-space-2);
+  color: var(--hl-fg-muted);
+  font-size: var(--hl-text-sm);
+}
 
 /* ── status pill ───────────────────────────────────────────────────────────
    The headline state. One per surface, near the top.                         */
@@ -299,7 +428,10 @@ td.hl-num {
   font-weight: var(--hl-weight-medium);
   line-height: 1.4;
   cursor: pointer;
+  /* Kills the ~300ms tap delay and double-tap-to-zoom on the control itself. */
+  touch-action: manipulation;
 }
+.hl-btn:active { transform: translateY(1px); }
 .hl-btn:hover { background: var(--hl-sunken); }
 .hl-btn--primary {
   background: var(--hl-accent);
@@ -332,6 +464,76 @@ td.hl-num {
   outline: none;
 }
 .hl-input::placeholder { color: var(--hl-fg-subtle); }
+
+/* ── footer ────────────────────────────────────────────────────────────────
+   Where provenance lives. Row one of the shell header answers "what is this
+   and is it healthy"; the footer answers "which build is this and when did it
+   last do anything" — questions you ask deliberately, not at a glance.
+
+     [app-specific meta…] ················· [commit · build date]
+
+   The commit is REQUIRED and right-most. It is the only way to confirm a
+   Watchtower update landed, so it must be in the same place on every
+   appliance or it is not findable.
+
+   Measured from --hl-page-max like .hl-page, so the rule above it lines up
+   with the content column rather than cutting the full viewport.             */
+.hl-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--hl-space-2) var(--hl-space-4);
+  max-width: var(--hl-page-max);
+  margin: 0 auto;
+  padding: var(--hl-space-4) max(var(--hl-space-4), env(safe-area-inset-right))
+           max(var(--hl-space-5), env(safe-area-inset-bottom))
+           max(var(--hl-space-4), env(safe-area-inset-left));
+  border-top: 1px solid var(--hl-border);
+  color: var(--hl-fg-muted);
+  font-size: var(--hl-text-sm);
+}
+/* Pushes the commit to the right edge, exactly as in the header. */
+.hl-footer-spacer { margin-left: auto; }
+.hl-footer-meta {
+  font-family: var(--hl-font-mono);
+  font-size: var(--hl-text-xs);
+  color: var(--hl-fg-muted);
+  white-space: nowrap;
+}
+
+/* ── responsive + touch ────────────────────────────────────────────────────
+   These live here rather than in three appliances. .hl-header already wrapped
+   at 560px and nothing else in the sheet had an opinion, so each app wrote its
+   own breakpoints — 520px, 480px, and none at all — which is the same drift
+   the component classes exist to prevent.                                    */
+@media (max-width: 600px) {
+  .hl-page {
+    padding: var(--hl-space-4) max(var(--hl-space-3), env(safe-area-inset-right))
+             var(--hl-space-5) max(var(--hl-space-3), env(safe-area-inset-left));
+  }
+  .hl-footer {
+    padding-left: max(var(--hl-space-3), env(safe-area-inset-left));
+    padding-right: max(var(--hl-space-3), env(safe-area-inset-right));
+  }
+  .hl-table th,
+  .hl-table td { padding: var(--hl-space-2); }
+}
+
+/* Touch sizing keys off the POINTER, not the viewport width. A narrow desktop
+   window is not a touchscreen and shouldn't lose density for one; a tablet in
+   landscape is one and should get the target regardless of how wide it is.
+   ac-monitor applied the 44px floor unconditionally, which got the phone right
+   and the desktop wrong. */
+@media (pointer: coarse) {
+  .hl-btn  { min-height: 44px; }
+  .hl-input {
+    min-height: 44px;
+    /* 16px is not a taste decision. Below it, mobile Safari zooms the viewport
+       on focus and does NOT zoom back out, leaving the surface scrolled
+       sideways mid-form. Every input in the fleet was 13px. */
+    font-size: 16px;
+  }
+}
 
 /* ── motion ────────────────────────────────────────────────────────────────
    Scoped to .hl-* rather than `*`. A blanket reset would reach the split-flap

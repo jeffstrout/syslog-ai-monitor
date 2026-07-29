@@ -60,6 +60,14 @@
   --hl-info:          #4c5561;   /* 6.69:1 on its own wash, 7.10:1 on canvas */
   --hl-info-wash:     rgba(76, 85, 97, .08);
 
+  /* ── layout ────────────────────────────────────────────────────────────────
+     One content width for the fleet. This was the last thing every appliance
+     still chose for itself — 980px, 760px and 640px on three surfaces that are
+     meant to read as one application — so it is a token now rather than a
+     number each app picks. .hl-page and .hl-footer both measure from it, which
+     is what keeps the footer rule aligned with the content above it.         */
+  --hl-page-max:      960px;
+
   /* ── radii ─────────────────────────────────────────────────────────────── */
   --hl-radius-sm:     4px;       /* chips, inputs */
   --hl-radius:        6px;       /* default: cards, buttons, tiles */
