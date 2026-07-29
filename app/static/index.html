@@ -14,9 +14,11 @@
     margin: 0; font: var(--hl-text-base)/var(--hl-leading) var(--hl-font-sans);
     background: var(--hl-canvas); color: var(--hl-fg);
   }
-  /* The shell header, its nav, pills and buttons all come from components.css.
-     Only row two -- this appliance's own action bar -- is declared here. The
-     contract allows an app-specific second row; row one is shared.
+  /* The shell header, its nav, pills, buttons, the page column, sections,
+     banners, cards and the footer all come from components.css. Only row two
+     -- this appliance's own action bar -- and genuinely app-specific shapes
+     are declared here. The contract allows an app-specific second row; row one
+     is shared.
 
      Both rows sit inside one sticky wrapper rather than each being sticky, so
      row two doesn't need to hardcode row one's height as a `top` offset. That
@@ -30,20 +32,11 @@
   }
   .spacer { flex: 1; }
   .meta { color: var(--hl-fg-muted); font-size: var(--hl-text-sm); }
-  main { max-width: 980px; margin: 0 auto; padding: 24px; }
-  .banner {
-    padding: 16px 20px; border-radius: var(--hl-radius-lg); margin-bottom: 24px;
-    border: 1px solid var(--hl-border); background: var(--hl-surface);
-  }
-  .banner h2 { margin: 0 0 6px; font-size: 16px; }
-  .banner.s-ok { border-left: 4px solid var(--hl-ok); }
-  .banner.s-warning { border-left: 4px solid var(--hl-warn); }
-  .banner.s-error { border-left: 4px solid var(--hl-crit); }
-  h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--hl-fg-muted); margin: 28px 0 12px; }
-  .finding {
-    border: 1px solid var(--hl-border); border-radius: var(--hl-radius); padding: 14px 16px;
-    margin-bottom: 12px; background: var(--hl-surface);
-  }
+  /* A finding is a .hl-card carrying its severity on the left border. It was an
+     unaccented card with the severity as a chip inside, which made a page of
+     findings a flat wall -- the point of the accented border is that a critical
+     one is visible without reading it. Only the internal layout is local now. */
+  .finding + .finding { margin-top: var(--hl-space-3); }
   .finding .top { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
   .finding .title { font-weight: 600; }
   .sev { padding: 1px 8px; border-radius: var(--hl-radius-sm); font-size: 11px; font-weight: 700; text-transform: uppercase; }
@@ -53,10 +46,14 @@
   .sev-critical { background: var(--hl-crit-wash); color: var(--hl-crit-strong); }
   .cat { color: var(--hl-fg-muted); font-size: 12px; }
   .finding .detail { margin: 4px 0; }
+  /* Log lines are long unbroken tokens -- IPv6, hex, CEF fields -- and
+     `word-break` does not reliably break inside one, so the block used to widen
+     and take the page body sideways with it. It scrolls inside its own box now
+     (.hl-scroll-x on the wrapper); the page body never scrolls sideways. */
   .finding .evidence {
     font-family: var(--hl-font-mono); font-size: 12px;
     background: var(--hl-sunken); padding: 8px 10px; border-radius: var(--hl-radius); color: var(--hl-fg-muted);
-    white-space: pre-wrap; word-break: break-word; margin: 8px 0;
+    white-space: pre; margin: 8px 0;
   }
   .finding .rec { font-size: 13px; color: var(--hl-accent); }
   .history-item {
@@ -75,14 +72,12 @@
   .history-item .when { color: var(--hl-fg-muted); font-size: 13px; }
   .history-item .sum { color: var(--hl-fg); line-height: 1.55; }
   .history-body { padding: 0 16px 14px; }
-  .empty { color: var(--hl-fg-muted); padding: 20px 0; }
   .runmsg { color: var(--hl-fg-muted); font-size: 13px; }
-  /* Row one's narrow-screen wrap is components.css's job now (560px). Only
-     row two and the page gutter are app concerns. */
+  /* Row one's narrow-screen wrap (560px) and the page gutters (600px) are
+     components.css's job now. Only row two is an app concern. */
   @media (max-width: 480px) {
     .shell .hl-header { padding: 10px 14px; }
     .hl-header-name { font-size: 16px; }
-    main { padding: 16px; }
     .meta { font-size: 12px; }
     /* Refresh goes: the dashboard already polls, and the space is better spent
        on the action that costs money to run. */
@@ -97,11 +92,10 @@
     .hbar.links > * { flex: 0 0 auto; }
     .hbar.links .spacer { display: none; }
   }
-  code { font-family: var(--hl-font-mono); }
-  /* Weekly pattern section */
-  .weekly-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  .hl-btn--sm { font-size: 12px; padding: 5px 11px; min-height: 0; }
-  .subhead { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--hl-fg-muted); margin: 16px 0 8px; }
+  /* Weekly pattern section. The heading + button row is .hl-section-title,
+     which is a flex row precisely so a section can carry a trailing action. */
+  .hl-btn--sm { font-size: 12px; padding: 5px 11px; }
+  .subhead { margin-top: var(--hl-space-4); }
   .trend { padding: 8px 0; border-bottom: 1px solid var(--hl-border); font-size: 14px; line-height: 1.5; }
   .trend:last-child { border-bottom: none; }
   .dir { font-weight: 700; font-size: 11px; padding: 1px 7px; border-radius: var(--hl-radius-sm); margin-right: 8px; white-space: nowrap; }
@@ -128,46 +122,63 @@
       <a class="hl-header-link" href="/api/weekly" target="_blank" rel="noopener">Weekly&nbsp;JSON</a>
       <a class="hl-header-link" href="/api/status" target="_blank" rel="noopener">Status&nbsp;JSON</a>
     </nav>
-    <span class="hl-header-meta" id="build"></span>
   </header>
-  <!-- Row two is this appliance's own: its primary action and live counters. -->
+  <!-- Row two is this appliance's own: its primary action. The buffered count
+       moved to the footer -- it is ambient telemetry, not an action, and sat
+       beside a button only because both were "small text in a bar". -->
   <div class="hbar links">
     <button class="hl-btn hl-btn--primary" onclick="runNow(this)">▶ Run evaluation now</button>
     <span class="runmsg" id="runmsg"></span>
     <div class="spacer"></div>
-    <span class="meta hl-num" id="buffered"></span>
     <button class="hl-btn refresh" onclick="load()">Refresh</button>
   </div>
 </div>
 
-<main>
-  <div id="latest"></div>
+<main class="hl-page">
+  <section class="hl-section" id="latest"></section>
 
-  <h3 class="weekly-head">
-    Last 7 days — patterns
-    <button class="hl-btn hl-btn--primary hl-btn--sm" onclick="runWeekly(this)">▶ Run weekly review</button>
-    <span class="runmsg" id="weeklymsg"></span>
-  </h3>
-  <div id="weekly"><div class="empty">Loading…</div></div>
+  <section class="hl-section">
+    <h3 class="hl-section-title">
+      Last 7 days — patterns
+      <button class="hl-btn hl-btn--primary hl-btn--sm" onclick="runWeekly(this)">▶ Run weekly review</button>
+      <span class="runmsg" id="weeklymsg"></span>
+    </h3>
+    <div id="weekly"><div class="hl-empty">Loading…</div></div>
+  </section>
 
-  <h3>History</h3>
-  <div id="history"><div class="empty">Loading…</div></div>
+  <section class="hl-section">
+    <h3 class="hl-section-title">History</h3>
+    <div id="history"><div class="hl-empty">Loading…</div></div>
+  </section>
 </main>
+
+<!-- Provenance, where every appliance carries it (homelab-standards#8). The
+     commit used to sit right-most in the header; the header is the row you
+     scan, and "which build is this" is a question you go looking for once. -->
+<footer class="hl-footer">
+  <span class="hl-num" id="buffered"></span>
+  <span class="hl-footer-spacer"></span>
+  <span class="hl-footer-meta" id="build"></span>
+</footer>
 
 <script>
 const fmt = (ts) => ts ? new Date(ts * 1000).toLocaleString() : "—";
 const esc = (s) => (s ?? "").toString().replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 
+// Finding severity -> the shared card's left-border modifier. `critical` and
+// `error` share --crit; the .sev chip still distinguishes them.
+const CARD_MOD = { info: "info", warning: "warn", error: "crit", critical: "crit" };
+
 function findingHTML(f) {
   const sev = (f.severity || "info").toLowerCase();
-  return `<div class="finding">
+  return `<div class="finding hl-card hl-card--accented hl-card--${CARD_MOD[sev] || "info"}">
     <div class="top">
       <span class="sev sev-${esc(sev)}">${esc(sev)}</span>
       <span class="title">${esc(f.title)}</span>
       <span class="cat">${esc(f.category)} · ×${esc(f.occurrences)}</span>
     </div>
     <div class="detail">${esc(f.detail)}</div>
-    ${f.evidence ? `<div class="evidence">${esc(f.evidence)}</div>` : ""}
+    ${f.evidence ? `<div class="hl-scroll-x"><div class="evidence">${esc(f.evidence)}</div></div>` : ""}
     ${f.recommendation ? `<div class="rec">→ ${esc(f.recommendation)}</div>` : ""}
   </div>`;
 }
@@ -175,21 +186,21 @@ function findingHTML(f) {
 function renderLatest(latest) {
   const el = document.getElementById("latest");
   if (!latest) {
-    el.innerHTML = `<div class="banner"><h2>No evaluations yet</h2>
-      <div class="meta">Logs are being collected. The first hourly evaluation will appear here.</div></div>`;
+    el.innerHTML = `<div class="hl-banner"><h2 class="hl-banner-title">No evaluations yet</h2>
+      <div class="hl-banner-meta">Logs are being collected. The first hourly evaluation will appear here.</div></div>`;
     return;
   }
   const p = latest.payload || {};
   const status = (p.overall_status || "ok").toLowerCase();
   const findings = p.findings || [];
   el.innerHTML = `
-    <div class="banner s-${esc(status)}">
-      <h2>Latest evaluation — ${fmt(latest.ts)}</h2>
+    <div class="hl-banner hl-banner--${PILL_MOD[status] || "info"}">
+      <h2 class="hl-banner-title">Latest evaluation — ${fmt(latest.ts)}</h2>
       <div>${esc(p.summary)}</div>
-      <div class="meta" style="margin-top:6px">${esc(latest.log_count)} log lines analyzed · ${findings.length} finding(s)</div>
+      <div class="hl-banner-meta">${esc(latest.log_count)} log lines analyzed · ${findings.length} finding(s)</div>
     </div>
-    ${findings.length ? `<h3>Findings</h3>${findings.map(findingHTML).join("")}`
-                      : `<div class="empty">No issues found in the latest period. ✅</div>`}`;
+    ${findings.length ? `<h3 class="hl-section-title subhead">Findings</h3>${findings.map(findingHTML).join("")}`
+                      : `<div class="hl-empty">No issues found in the latest period. ✅</div>`}`;
 }
 
 // The shared pill takes --ok/--warn/--crit; this app speaks ok/warning/error.
@@ -204,7 +215,7 @@ const WEEKLY_COLOR = { action: "error", watch: "warning", ok: "ok" };
 
 function recurringHTML(r) {
   const sev = (r.severity || "info").toLowerCase();
-  return `<div class="finding">
+  return `<div class="finding hl-card hl-card--accented hl-card--${CARD_MOD[sev] || "info"}">
     <div class="top">
       <span class="sev sev-${esc(sev)}">${esc(sev)}</span>
       <span class="title">${esc(r.title)}</span>
@@ -225,7 +236,7 @@ function trendHTML(t) {
 function renderWeekly(w) {
   const el = document.getElementById("weekly");
   if (!w) {
-    el.innerHTML = `<div class="empty">No weekly review yet. It runs once a day over the last few days of findings — or click “Run weekly review” above.</div>`;
+    el.innerHTML = `<div class="hl-empty">No weekly review yet. It runs once a day over the last few days of findings — or click “Run weekly review” above.</div>`;
     return;
   }
   const p = w.payload || {};
@@ -235,20 +246,20 @@ function renderWeekly(w) {
   const trends = p.trends || [];
   const watch = p.watchlist || [];
   el.innerHTML = `
-    <div class="banner s-${esc(color)}">
-      <h2>${esc(w.window_days)}-day review <span class="hl-pill hl-pill--${PILL_MOD[color] || "info"}">${esc(s)}</span></h2>
+    <div class="hl-banner hl-banner--${PILL_MOD[color] || "info"}">
+      <h2 class="hl-banner-title">${esc(w.window_days)}-day review <span class="hl-pill hl-pill--${PILL_MOD[color] || "info"}">${esc(s)}</span></h2>
       <div>${esc(p.overall_assessment)}</div>
-      <div class="meta" style="margin-top:6px">${esc(w.finding_count)} hourly evaluations reviewed · ${fmt(w.period_start)} → ${fmt(w.period_end)} · reviewed ${fmt(w.ts)}</div>
+      <div class="hl-banner-meta">${esc(w.finding_count)} hourly evaluations reviewed · ${fmt(w.period_start)} → ${fmt(w.period_end)} · reviewed ${fmt(w.ts)}</div>
     </div>
-    ${recurring.length ? `<div class="subhead">Recurring issues</div>${recurring.map(recurringHTML).join("")}` : ""}
-    ${trends.length ? `<div class="subhead">Trends</div>${trends.map(trendHTML).join("")}` : ""}
-    ${watch.length ? `<div class="subhead">Watchlist</div><ul class="watchlist">${watch.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
-    ${(!recurring.length && !trends.length && !watch.length) ? `<div class="empty">No notable patterns this period. ✅</div>` : ""}`;
+    ${recurring.length ? `<div class="hl-section-title subhead">Recurring issues</div>${recurring.map(recurringHTML).join("")}` : ""}
+    ${trends.length ? `<div class="hl-section-title subhead">Trends</div>${trends.map(trendHTML).join("")}` : ""}
+    ${watch.length ? `<div class="hl-section-title subhead">Watchlist</div><ul class="watchlist">${watch.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+    ${(!recurring.length && !trends.length && !watch.length) ? `<div class="hl-empty">No notable patterns this period. ✅</div>` : ""}`;
 }
 
 function renderHistory(items) {
   const el = document.getElementById("history");
-  if (!items.length) { el.innerHTML = `<div class="empty">No history yet.</div>`; return; }
+  if (!items.length) { el.innerHTML = `<div class="hl-empty">No history yet.</div>`; return; }
   el.innerHTML = items.map(it => {
     const p = it.payload || {};
     const findings = p.findings || [];
@@ -262,7 +273,7 @@ function renderHistory(items) {
       </summary>
       <div class="history-body">
         ${findings.length ? findings.map(findingHTML).join("")
-                          : `<div class="empty">No issues found.</div>`}
+                          : `<div class="hl-empty">No issues found.</div>`}
       </div>
     </details>`;
   }).join("");
@@ -284,14 +295,15 @@ async function load() {
     renderHistory(histRes.findings || []);
   } catch (e) {
     document.getElementById("latest").innerHTML =
-      `<div class="banner s-error"><h2>Could not load data</h2><div class="meta">${esc(e)}</div></div>`;
+      `<div class="hl-banner hl-banner--crit"><h2 class="hl-banner-title">Could not load data</h2><div class="hl-banner-meta">${esc(e)}</div></div>`;
   }
 }
 
-// The running build, in the shell header where every appliance carries it.
-// This dashboard has never shown it: /api/version exists and nothing linked or
-// rendered it, so there was no way to tell from the UI whether a Watchtower
-// update had landed. Fetched once -- it cannot change without a restart.
+// The running build, in the footer where every appliance now carries it
+// (homelab-standards#8). This dashboard has never shown it at all: /api/version
+// exists and nothing linked or rendered it, so there was no way to tell from
+// the UI whether a Watchtower update had landed. Fetched once -- it cannot
+// change without a restart.
 async function loadBuild() {
   try {
     const v = await (await fetch("/api/version")).json();
