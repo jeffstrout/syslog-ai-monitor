@@ -1,9 +1,9 @@
 """FastAPI app: JSON API + the static dashboard.
 
 Interactive, auto-generated API docs are available at runtime:
-  - Swagger UI : http://<host>:8080/docs
-  - ReDoc      : http://<host>:8080/redoc
-  - OpenAPI    : http://<host>:8080/openapi.json
+  - Swagger UI : http://<host>/docs
+  - ReDoc      : http://<host>/redoc
+  - OpenAPI    : http://<host>/openapi.json
 """
 from __future__ import annotations
 

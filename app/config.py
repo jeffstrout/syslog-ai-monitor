@@ -37,6 +37,8 @@ class Settings:
 
     # Ports
     syslog_port: int = _int("SYSLOG_PORT", 514)
+    # In-container listen port. The port you browse to is the compose
+    # publish (WEB_HOST_PORT, default 80) — see .env.example.
     web_port: int = _int("WEB_PORT", 8080)
 
     # Digest limits

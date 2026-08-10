@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A single-container service for a Raspberry Pi that receives syslog from a UniFi
 UDM Pro on port 514, evaluates the accumulated logs hourly with Claude Haiku,
 rolls those evaluations up daily into a 7-day pattern review, and serves both
-from a dashboard on port 8080. Raw logs are deliberately ephemeral — only the
+from a dashboard on port 80. Raw logs are deliberately ephemeral — only the
 structured AI findings are retained.
 
 ## Commands
@@ -35,8 +35,8 @@ DB_PATH=./syslog.db SYSLOG_PORT=5514 python -m app.main
 **Exercise the pipeline without waiting for the hour:**
 ```bash
 logger -n localhost -P 5514 -d "test critical error: WAN link down"
-curl -X POST http://localhost:8080/api/run-now
-curl -X POST http://localhost:8080/api/run-weekly
+curl -X POST http://localhost/api/run-now
+curl -X POST http://localhost/api/run-weekly
 ```
 
 Both `run-now` and `run-weekly` accept GET as well as POST, so a browser visit
