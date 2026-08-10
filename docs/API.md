@@ -1,14 +1,14 @@
 # API Reference
 
 The Syslog AI Monitor exposes a small JSON API plus the dashboard, served by
-FastAPI on **port 8080**. All endpoints are **unauthenticated** and intended for
-a trusted LAN. Base URL: `http://<pi-ip>:8080`.
+FastAPI, published on **port 80**. All endpoints are **unauthenticated** and intended for
+a trusted LAN. Base URL: `http://<pi-ip>`.
 
 > **Interactive docs are built in.** FastAPI auto-generates live, explorable
 > documentation from the running service:
-> - **Swagger UI:** `http://<pi-ip>:8080/docs`
-> - **ReDoc:** `http://<pi-ip>:8080/redoc`
-> - **OpenAPI schema (JSON):** `http://<pi-ip>:8080/openapi.json`
+> - **Swagger UI:** `http://<pi-ip>/docs`
+> - **ReDoc:** `http://<pi-ip>/redoc`
+> - **OpenAPI schema (JSON):** `http://<pi-ip>/openapi.json`
 >
 > The reference below mirrors those, with copy-paste examples.
 
@@ -162,7 +162,7 @@ model error (billing, auth) scheduled runs are skipped until `retry_in_seconds`
 elapses; `POST /api/run-now` bypasses it.
 
 ```bash
-curl -s http://<pi-ip>:8080/api/health
+curl -s http://<pi-ip>/api/health
 ```
 
 ---
@@ -178,7 +178,7 @@ Watchtower auto-update landed.
 ```
 
 ```bash
-curl -s http://<pi-ip>:8080/api/version
+curl -s http://<pi-ip>/api/version
 ```
 
 ---
@@ -206,7 +206,7 @@ Lightweight overview used by the dashboard header.
 `latest` is `null` until the first evaluation has run.
 
 ```bash
-curl -s http://<pi-ip>:8080/api/status
+curl -s http://<pi-ip>/api/status
 ```
 
 ---
@@ -216,7 +216,7 @@ curl -s http://<pi-ip>:8080/api/status
 Returns the most recent `finding` object directly, or `null` if none exist yet.
 
 ```bash
-curl -s http://<pi-ip>:8080/api/latest
+curl -s http://<pi-ip>/api/latest
 ```
 
 ---
@@ -263,7 +263,7 @@ Returns recent findings, newest first.
 ```
 
 ```bash
-curl -s "http://<pi-ip>:8080/api/history?limit=50"
+curl -s "http://<pi-ip>/api/history?limit=50"
 ```
 
 ---
@@ -309,7 +309,7 @@ object directly, or `null` if none exist yet.
 ```
 
 ```bash
-curl -s http://<pi-ip>:8080/api/weekly
+curl -s http://<pi-ip>/api/weekly
 ```
 
 ---
@@ -324,7 +324,7 @@ Recent weekly reviews, newest first.
 `/api/weekly` shape.
 
 ```bash
-curl -s "http://<pi-ip>:8080/api/weekly/history?limit=10"
+curl -s "http://<pi-ip>/api/weekly/history?limit=10"
 ```
 
 ---
@@ -338,7 +338,7 @@ POST**. Returns `{ "ran": true, "result": { ...review... } }`, or
 the model call failed.
 
 ```bash
-curl -X POST http://<pi-ip>:8080/api/run-weekly
+curl -X POST http://<pi-ip>/api/run-weekly
 ```
 
 ---
@@ -361,15 +361,15 @@ evaluated raw logs.
   works, as does `curl -X POST`.
 
 ```bash
-curl http://<pi-ip>:8080/api/run-now          # GET works
-curl -X POST http://<pi-ip>:8080/api/run-now  # POST also works
+curl http://<pi-ip>/api/run-now          # GET works
+curl -X POST http://<pi-ip>/api/run-now  # POST also works
 ```
 
 ---
 
 ## Notes
 
-- **No authentication.** Anyone who can reach port 8080 can read findings and
+- **No authentication.** Anyone who can reach port 80 can read findings and
   trigger `/api/run-now` or `/api/run-weekly`. Keep it on a trusted network, or
   front it with a reverse proxy if you need auth.
 - **Timestamps** (`ts`) are Unix epoch seconds (UTC). The dashboard converts
