@@ -4,7 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A single-container service for a Raspberry Pi that receives syslog from a UniFi
+A single-container service for a Raspberry Pi (`syslog.strout.us`,
+`192.168.0.44`) that receives syslog from a UniFi
 UDM Pro on port 514, evaluates the accumulated logs hourly with Claude Haiku,
 rolls those evaluations up daily into a 7-day pattern review, and serves both
 from a dashboard on port 80. Raw logs are deliberately ephemeral — only the

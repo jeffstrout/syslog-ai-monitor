@@ -2,13 +2,13 @@
 
 The Syslog AI Monitor exposes a small JSON API plus the dashboard, served by
 FastAPI, published on **port 80**. All endpoints are **unauthenticated** and intended for
-a trusted LAN. Base URL: `http://<pi-ip>`.
+a trusted LAN. Base URL: `http://syslog.strout.us` (`192.168.0.44`).
 
 > **Interactive docs are built in.** FastAPI auto-generates live, explorable
 > documentation from the running service:
-> - **Swagger UI:** `http://<pi-ip>/docs`
-> - **ReDoc:** `http://<pi-ip>/redoc`
-> - **OpenAPI schema (JSON):** `http://<pi-ip>/openapi.json`
+> - **Swagger UI:** `http://syslog.strout.us/docs`
+> - **ReDoc:** `http://syslog.strout.us/redoc`
+> - **OpenAPI schema (JSON):** `http://syslog.strout.us/openapi.json`
 >
 > The reference below mirrors those, with copy-paste examples.
 
@@ -162,7 +162,7 @@ model error (billing, auth) scheduled runs are skipped until `retry_in_seconds`
 elapses; `POST /api/run-now` bypasses it.
 
 ```bash
-curl -s http://<pi-ip>/api/health
+curl -s http://syslog.strout.us/api/health
 ```
 
 ---
@@ -178,7 +178,7 @@ Watchtower auto-update landed.
 ```
 
 ```bash
-curl -s http://<pi-ip>/api/version
+curl -s http://syslog.strout.us/api/version
 ```
 
 ---
@@ -206,7 +206,7 @@ Lightweight overview used by the dashboard header.
 `latest` is `null` until the first evaluation has run.
 
 ```bash
-curl -s http://<pi-ip>/api/status
+curl -s http://syslog.strout.us/api/status
 ```
 
 ---
@@ -216,7 +216,7 @@ curl -s http://<pi-ip>/api/status
 Returns the most recent `finding` object directly, or `null` if none exist yet.
 
 ```bash
-curl -s http://<pi-ip>/api/latest
+curl -s http://syslog.strout.us/api/latest
 ```
 
 ---
@@ -263,7 +263,7 @@ Returns recent findings, newest first.
 ```
 
 ```bash
-curl -s "http://<pi-ip>/api/history?limit=50"
+curl -s "http://syslog.strout.us/api/history?limit=50"
 ```
 
 ---
@@ -309,7 +309,7 @@ object directly, or `null` if none exist yet.
 ```
 
 ```bash
-curl -s http://<pi-ip>/api/weekly
+curl -s http://syslog.strout.us/api/weekly
 ```
 
 ---
@@ -324,7 +324,7 @@ Recent weekly reviews, newest first.
 `/api/weekly` shape.
 
 ```bash
-curl -s "http://<pi-ip>/api/weekly/history?limit=10"
+curl -s "http://syslog.strout.us/api/weekly/history?limit=10"
 ```
 
 ---
@@ -338,7 +338,7 @@ POST**. Returns `{ "ran": true, "result": { ...review... } }`, or
 the model call failed.
 
 ```bash
-curl -X POST http://<pi-ip>/api/run-weekly
+curl -X POST http://syslog.strout.us/api/run-weekly
 ```
 
 ---
@@ -361,8 +361,8 @@ evaluated raw logs.
   works, as does `curl -X POST`.
 
 ```bash
-curl http://<pi-ip>/api/run-now          # GET works
-curl -X POST http://<pi-ip>/api/run-now  # POST also works
+curl http://syslog.strout.us/api/run-now          # GET works
+curl -X POST http://syslog.strout.us/api/run-now  # POST also works
 ```
 
 ---
