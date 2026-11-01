@@ -1,5 +1,8 @@
 # Syslog AI Monitor
 
+> **Archived 2026-11-01.** Syslog ingest and AI analysis moved into [godseye](https://github.com/jeffstrout/godseye) as `syslog-collector` + `syslog-analyzer` on DBServer (`192.168.0.247`), via [godseye #79](https://github.com/jeffstrout/godseye/issues/79) / [PR #80](https://github.com/jeffstrout/godseye/pull/80). The UDM Pro SIEM target now points at `.247`. This repo is read-only.
+
+
 A lightweight, self-hosted service for a **Raspberry Pi 4B** (or any Linux host) that:
 
 - **Receives** syslog from a **UniFi UDM Pro** (UDP/TCP port 514; CEF/SIEM format supported),
